@@ -8,7 +8,7 @@
 </head>
 <body>
   <header>
-    <h1>🎬 ASMR Video Tool <span class="version">v1.1</span></h1>
+    <h1>🎬 ASMR Video Tool <span class="version">v1.2</span></h1>
   </header>
 
   <main>
@@ -18,7 +18,6 @@
         <div class="drop-icon">🎥</div>
         <p>Drag & Drop Video Here</p>
         <span>atau</span>
-        <!-- Bug Fix #1: Browse button via tkinter -->
         <button class="btn-browse" onclick="browseFile()">📂 Browse File...</button>
         <div class="path-row">
           <input type="text" id="file-path" placeholder="Atau ketik full path: C:\videos\input.mp4" />
@@ -26,7 +25,6 @@
         </div>
       </div>
 
-      <!-- Bug Fix #3: Pipeline Indicator -->
       <div id="pipeline-indicator" class="pipeline-indicator hidden"></div>
 
       <div id="file-info" class="hidden">
@@ -58,7 +56,6 @@
         <h3>✂️ Crop Watermark</h3>
         <label>Potong bagian bawah (px)</label>
         <input type="number" id="crop-px" value="50" min="1" max="200" />
-        <label><input type="checkbox" id="crop-pad" checked /> Tambah padding hitam (jaga resolusi)</label>
         <div class="output-row">
           <label>Output file</label>
           <div class="input-browse-row">
@@ -103,11 +100,43 @@
         </div>
         <input type="number" id="loop-duration" value="3600" min="60" />
         <span class="duration-label" id="duration-label">= 1 jam 0 menit</span>
+
         <label>Mode</label>
-        <select id="loop-mode">
-          <option value="fast">Fast Copy (Cepat)</option>
-          <option value="hq" selected>HQ Re-encode (Recommended)</option>
+        <select id="loop-mode" onchange="updateLoopModeUI()">
+          <option value="fast">⚡ Fast Copy (Cepat, noise buatan)</option>
+          <option value="hq">🎞️ HQ Re-encode (noise buatan)</option>
+          <option value="v2" selected>🆕 V2 — Audio Asli + Crossfade (Recommended)</option>
         </select>
+
+        <!-- V2 Info Badge -->
+        <div id="loop-v2-info" class="v2-info-box">
+          <strong>🆕 Mode V2 — 4 Step Pipeline:</strong>
+          <ol>
+            <li>Loop video <code>-c:v copy</code> (tanpa re-encode, cepat)</li>
+            <li>Extract audio asli → WAV</li>
+            <li>Loop audio 1 jam + crossfade di loop point</li>
+            <li>Mux video + audio (keduanya copy, sangat cepat)</li>
+          </ol>
+          <p class="note">✅ Kualitas video terjaga, audio asli video digunakan (bukan noise buatan)</p>
+        </div>
+
+        <!-- Crossfade (v2 only) -->
+        <div id="loop-crossfade-row">
+          <label>Crossfade audio (detik)</label>
+          <input type="number" id="loop-crossfade" value="0.3" step="0.1" min="0.1" max="2" />
+          <span class="note">Durasi fade in/out di awal dan akhir loop audio</span>
+        </div>
+
+        <!-- Noise (hq/fast only) -->
+        <div id="loop-noise-row" class="hidden">
+          <label>Warna Noise Ambient</label>
+          <select id="loop-noise">
+            <option value="brown" selected>🟤 Brown Noise</option>
+            <option value="pink">🩷 Pink Noise</option>
+            <option value="white">⬜ White Noise</option>
+          </select>
+        </div>
+
         <div class="output-row">
           <label>Output file</label>
           <div class="input-browse-row">
@@ -171,7 +200,7 @@
       <!-- TAB: ALL IN ONE -->
       <div id="tab-all" class="tab-content">
         <h3>🚀 All-in-One Pipeline</h3>
-        <p class="note">Jalankan semua step otomatis: Crop → Upscale → Loop → Audio → Thumbnail</p>
+        <p class="note">Jalankan semua step otomatis: Crop → Upscale → Loop → Thumbnail</p>
         <div class="all-grid">
           <label>📁 Output Folder</label>
           <div class="input-browse-row">
@@ -195,12 +224,20 @@
             <input type="number" id="all-duration" value="3600" />
           </div>
 
+          <label>🔁 Loop Mode</label>
+          <select id="all-loop-mode">
+            <option value="fast">⚡ Fast Copy</option>
+            <option value="hq">🎞️ HQ Re-encode</option>
+            <option value="v2" selected>🆕 V2 — Audio Asli + Crossfade</option>
+          </select>
+
           <label>🔊 Noise Ambient</label>
           <select id="all-noise">
             <option value="brown" selected>Brown Noise</option>
             <option value="pink">Pink Noise</option>
             <option value="white">White Noise</option>
           </select>
+          <span class="note" style="grid-column:1/-1;margin-top:-8px">⚠️ Noise hanya digunakan jika Loop Mode bukan V2</span>
 
           <label>🖼️ Thumbnail Teks 1</label>
           <input type="text" id="all-thumb1" placeholder="Rainy Night ASMR" />
