@@ -184,6 +184,17 @@ function setDuration(sec) {
   document.getElementById('loop-duration').dispatchEvent(new Event('input'));
 }
 
+// ── LOOP MODE TOGGLE ─────────────────────────────────────────────
+function updateLoopModeUI() {
+  const mode = document.getElementById('loop-mode').value;
+  const noiseRow = document.getElementById('loop-noise-row');
+  const v2Info = document.getElementById('loop-v2-info');
+  const crossfadeRow = document.getElementById('loop-crossfade-row');
+  if (noiseRow) noiseRow.classList.toggle('hidden', mode === 'v2');
+  if (v2Info) v2Info.classList.toggle('hidden', mode !== 'v2');
+  if (crossfadeRow) crossfadeRow.classList.toggle('hidden', mode !== 'v2');
+}
+
 // ── AUDIO CUSTOM TOGGLE ──────────────────────────────────────────
 document.getElementById('audio-noise').addEventListener('change', function() {
   document.getElementById('audio-custom-row').classList.toggle('hidden', this.value !== 'custom');
@@ -209,8 +220,16 @@ async function runProcess(action) {
     params.video_duration = fileInfo.duration || 8;
     params.fps = fileInfo.fps || 24;
     params.noise = 'brown';
-    // Kirim mode ke backend: fast atau hq
     params.mode = document.getElementById('loop-mode').value;
+
+    // V2 mode: gunakan endpoint /api/loop-v2
+    if (params.mode === 'v2') {
+      if (!params.output) return alert('Isi output path dulu!');
+      params.crossfade = parseFloat(document.getElementById('loop-crossfade')?.value || '0.3');
+      const outputPath = params.output;
+      startStream('/api/loop-v2', { params }, () => setLastOutput(outputPath, 'loop-v2'));
+      return;
+    }
   } else if (action === 'audio') {
     params.output = document.getElementById('audio-output').value;
     params.noise = document.getElementById('audio-noise').value;
@@ -219,7 +238,6 @@ async function runProcess(action) {
       params.custom_audio = document.getElementById('audio-custom-path').value;
     }
   } else if (action === 'thumbnail') {
-    // Thumbnail dari file original
     params.input = pipelineState.original || fileInfo.path;
     params.output = document.getElementById('thumb-output').value;
     params.text1 = document.getElementById('thumb-text1').value;
@@ -233,7 +251,6 @@ async function runProcess(action) {
 
   const outputPath = params.output;
   startStream('/api/process', { action, params }, () => {
-    // Thumbnail tidak masuk pipeline chain
     if (action !== 'thumbnail') setLastOutput(outputPath, action);
   });
 }
@@ -250,6 +267,7 @@ async function runProcessAll() {
     video_duration: fileInfo.duration || 8,
     fps: fileInfo.fps || 24,
     noise_color: document.getElementById('all-noise').value,
+    loop_mode: document.getElementById('all-loop-mode')?.value || 'hq',
     thumb_text1: document.getElementById('all-thumb1').value,
     thumb_text2: document.getElementById('all-thumb2').value,
   };
@@ -308,12 +326,19 @@ function handleStreamData(d, onDoneCallback) {
       if (speedMatch) setProgress(null, `⚡ Speed: ${speedMatch[1]}x realtime`);
     }
   }
-  if (d.step) appendLog(`\n📦 Step ${d.step}/${d.total}: ${d.cmd}...`);
+  if (d.step) {
+    const label = d.label ? ` — ${d.label}` : '';
+    appendLog(`\n📦 Step ${d.step}/${d.total}${label}: ${d.cmd || ''}...`);
+    setProgress(Math.round(((d.step - 1) / d.total) * 90), `Step ${d.step}/${d.total}${label}`);
+  }
   if (d.status === 'done' || d.status === 'all_done') {
     setProgress(100, '✅ Selesai!');
     document.getElementById('btn-open-folder').classList.remove('hidden');
     if (d.output) appendLog(`\n✅ Output: ${d.output}`);
     if (d.thumbnail) appendLog(`🖼️ Thumbnail: ${d.thumbnail}`);
+    if (d.tmp) {
+      appendLog(`🗂️ Temp files: ${Object.values(d.tmp).join(', ')}`);
+    }
     if (onDoneCallback) onDoneCallback();
   }
   if (d.status === 'error') {
