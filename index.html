@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎬 ASMR Video Tool</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🎬 ASMR Video Tool <span class="version">v1.0</span></h1>
+  </header>
+
+  <main>
+    <!-- LEFT PANEL -->
+    <section class="panel left-panel">
+      <div id="drop-zone">
+        <div class="drop-icon">🎥</div>
+        <p>Drag & Drop Video Here</p>
+        <span>or</span>
+        <input type="text" id="file-path" placeholder="Paste full path: C:\videos\input.mp4" />
+        <button onclick="probeVideo()">📂 Load</button>
+      </div>
+
+      <div id="file-info" class="hidden">
+        <h3>📄 File Info</h3>
+        <table>
+          <tr><td>Nama</td><td id="info-name">-</td></tr>
+          <tr><td>Durasi</td><td id="info-duration">-</td></tr>
+          <tr><td>Resolusi</td><td id="info-res">-</td></tr>
+          <tr><td>FPS</td><td id="info-fps">-</td></tr>
+          <tr><td>Ukuran</td><td id="info-size">-</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL -->
+    <section class="panel right-panel">
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('crop')">✂️ Crop</button>
+        <button class="tab" onclick="switchTab('upscale')">⬆️ Upscale</button>
+        <button class="tab" onclick="switchTab('loop')">🔁 Loop</button>
+        <button class="tab" onclick="switchTab('audio')">🔊 Audio</button>
+        <button class="tab" onclick="switchTab('thumbnail')">🖼️ Thumb</button>
+        <button class="tab tab-all" onclick="switchTab('all')">🚀 All-in-One</button>
+      </div>
+
+      <!-- TAB: CROP -->
+      <div id="tab-crop" class="tab-content active">
+        <h3>✂️ Crop Watermark</h3>
+        <label>Potong bagian bawah (px)</label>
+        <input type="number" id="crop-px" value="50" min="1" max="200" />
+        <label><input type="checkbox" id="crop-pad" checked /> Tambah padding hitam (jaga resolusi)</label>
+        <div class="output-row">
+          <label>Output file</label>
+          <input type="text" id="crop-output" placeholder="C:\output\cropped.mp4" />
+        </div>
+        <button class="btn-process" onclick="runProcess('crop')">▶ Crop</button>
+      </div>
+
+      <!-- TAB: UPSCALE -->
+      <div id="tab-upscale" class="tab-content">
+        <h3>⬆️ Upscale ke 1080p</h3>
+        <p class="note">⚠️ Hanya memproses jika resolusi input di bawah 1080p. Max output: 1920x1080.</p>
+        <label>Algoritma</label>
+        <select id="upscale-algo">
+          <option value="lanczos" selected>Lanczos (Recommended)</option>
+          <option value="bicubic">Bicubic</option>
+          <option value="bilinear">Bilinear (Cepat)</option>
+        </select>
+        <label>CRF Quality (lebih kecil = lebih tajam)</label>
+        <input type="number" id="upscale-crf" value="18" min="1" max="30" />
+        <div class="output-row">
+          <label>Output file</label>
+          <input type="text" id="upscale-output" placeholder="C:\output\upscaled.mp4" />
+        </div>
+        <button class="btn-process" onclick="runProcess('upscale')">▶ Upscale</button>
+      </div>
+
+      <!-- TAB: LOOP -->
+      <div id="tab-loop" class="tab-content">
+        <h3>🔁 Loop Video</h3>
+        <label>Target Durasi</label>
+        <div class="preset-btns">
+          <button onclick="setDuration(3600)">1 Jam</button>
+          <button onclick="setDuration(10800)">3 Jam</button>
+          <button onclick="setDuration(28800)">8 Jam</button>
+          <button onclick="setDuration(36000)">10 Jam</button>
+        </div>
+        <input type="number" id="loop-duration" value="3600" min="60" />
+        <span class="duration-label" id="duration-label">= 1 jam 0 menit</span>
+        <label>Mode</label>
+        <select id="loop-mode">
+          <option value="fast">Fast Copy (Cepat)</option>
+          <option value="hq" selected>HQ Re-encode (Recommended)</option>
+        </select>
+        <div class="output-row">
+          <label>Output file</label>
+          <input type="text" id="loop-output" placeholder="C:\output\asmr_1jam.mp4" />
+        </div>
+        <button class="btn-process" onclick="runProcess('loop')">▶ Loop</button>
+      </div>
+
+      <!-- TAB: AUDIO -->
+      <div id="tab-audio" class="tab-content">
+        <h3>🔊 Inject Audio Ambient</h3>
+        <label>Tipe Noise</label>
+        <select id="audio-noise">
+          <option value="brown" selected>🟤 Brown Noise (ASMR Recommended)</option>
+          <option value="pink">🩷 Pink Noise (Lembut)</option>
+          <option value="white">⬜ White Noise</option>
+          <option value="custom">📁 Custom Audio File</option>
+        </select>
+        <div id="audio-custom-row" class="hidden">
+          <label>Path audio file (MP3/WAV)</label>
+          <input type="text" id="audio-custom-path" placeholder="C:\audio\rain.mp3" />
+        </div>
+        <div class="output-row">
+          <label>Output file</label>
+          <input type="text" id="audio-output" placeholder="C:\output\with_audio.mp4" />
+        </div>
+        <button class="btn-process" onclick="runProcess('audio')">▶ Inject Audio</button>
+      </div>
+
+      <!-- TAB: THUMBNAIL -->
+      <div id="tab-thumbnail" class="tab-content">
+        <h3>🖼️ Extract Thumbnail</h3>
+        <label>Teks Judul (Baris 1)</label>
+        <input type="text" id="thumb-text1" placeholder="Rainy Night ASMR" />
+        <label>Sub Judul (Baris 2)</label>
+        <input type="text" id="thumb-text2" placeholder="City Lights · Lake View · 1 Hour" />
+        <label>Ukuran Font Judul</label>
+        <input type="number" id="thumb-size1" value="72" />
+        <label>Warna Teks</label>
+        <input type="color" id="thumb-color" value="#ffffff" />
+        <label>Ambil frame di detik ke-</label>
+        <input type="number" id="thumb-frame" value="1" min="0" />
+        <div class="output-row">
+          <label>Output file</label>
+          <input type="text" id="thumb-output" placeholder="C:\output\thumbnail.jpg" />
+        </div>
+        <button class="btn-process" onclick="runProcess('thumbnail')">▶ Extract Thumbnail</button>
+      </div>
+
+      <!-- TAB: ALL IN ONE -->
+      <div id="tab-all" class="tab-content">
+        <h3>🚀 All-in-One Pipeline</h3>
+        <p class="note">Jalankan semua step otomatis: Crop → Upscale → Loop → Audio → Thumbnail</p>
+        <div class="all-grid">
+          <label>📁 Output Folder</label>
+          <input type="text" id="all-output-dir" placeholder="C:\output" />
+
+          <label>✂️ Crop (px bawah)</label>
+          <input type="number" id="all-crop-px" value="50" />
+
+          <label>⬆️ Upscale ke 1080p</label>
+          <label><input type="checkbox" id="all-upscale" checked /> Aktifkan upscale</label>
+
+          <label>🔁 Durasi Loop</label>
+          <div class="preset-btns">
+            <button onclick="document.getElementById('all-duration').value=3600">1 Jam</button>
+            <button onclick="document.getElementById('all-duration').value=10800">3 Jam</button>
+            <button onclick="document.getElementById('all-duration').value=28800">8 Jam</button>
+          </div>
+          <input type="number" id="all-duration" value="3600" />
+
+          <label>🔊 Noise Ambient</label>
+          <select id="all-noise">
+            <option value="brown" selected>Brown Noise</option>
+            <option value="pink">Pink Noise</option>
+            <option value="white">White Noise</option>
+          </select>
+
+          <label>🖼️ Thumbnail Teks 1</label>
+          <input type="text" id="all-thumb1" placeholder="Rainy Night ASMR" />
+
+          <label>🖼️ Thumbnail Teks 2</label>
+          <input type="text" id="all-thumb2" placeholder="City Lights · 1 Hour" />
+        </div>
+        <button class="btn-process btn-all" onclick="runProcessAll()">🚀 Process All</button>
+      </div>
+
+      <!-- OUTPUT + PROGRESS -->
+      <div class="output-section">
+        <div class="progress-bar-wrap">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <div id="progress-info">Ready</div>
+        <div id="log-box"></div>
+        <button id="btn-open-folder" class="hidden" onclick="openFolder()">📂 Open Output Folder</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

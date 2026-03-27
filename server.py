@@ -1,0 +1,237 @@
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+import subprocess
+import asyncio
+import os
+import json
+import platform
+
+app = FastAPI(title="ASMR Video Tool")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/static", StaticFiles(directory="."), name="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.post("/api/probe")
+async def probe_video(request: Request):
+    data = await request.json()
+    path = data.get("path", "").strip()
+    if not os.path.exists(path):
+        return JSONResponse({"error": "File tidak ditemukan"}, status_code=404)
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration,size,bit_rate:stream=width,height,r_frame_rate,codec_name",
+            "-of", "json", path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        info = json.loads(result.stdout)
+        fmt = info.get("format", {})
+        streams = info.get("streams", [])
+        video_stream = next((s for s in streams if s.get("codec_name") not in ["aac", "mp3", "opus"]), {})
+        duration = float(fmt.get("duration", 0))
+        size = int(fmt.get("size", 0))
+        fps_raw = video_stream.get("r_frame_rate", "24/1")
+        fps_parts = fps_raw.split("/")
+        fps = round(int(fps_parts[0]) / int(fps_parts[1]), 2)
+        width = video_stream.get("width", 0)
+        height = video_stream.get("height", 0)
+        return {
+            "duration": round(duration, 2),
+            "duration_str": f"{int(duration//3600)}j {int((duration%3600)//60)}m {int(duration%60)}s",
+            "size": size,
+            "size_str": f"{size/1024/1024:.1f} MB",
+            "width": width,
+            "height": height,
+            "fps": fps,
+            "resolution": f"{width}x{height}",
+            "filename": os.path.basename(path)
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+def build_ffmpeg_cmd(action: str, params: dict) -> list:
+    input_path = params["input"]
+    output_path = params["output"]
+
+    if action == "crop":
+        px = params.get("pixels", 50)
+        return [
+            "ffmpeg", "-y", "-i", input_path,
+            "-vf", f"crop=in_w:in_h-{px}:0:0,pad=iw:ih+{px}:0:0:black",
+            "-c:v", "libx264", "-crf", "23", "-c:a", "aac",
+            output_path
+        ]
+
+    elif action == "upscale":
+        return [
+            "ffmpeg", "-y", "-i", input_path,
+            "-vf", "scale=1920:1080:flags=lanczos",
+            "-c:v", "libx264", "-crf", "18", "-preset", "slow",
+            "-c:a", "copy",
+            output_path
+        ]
+
+    elif action == "loop":
+        duration = int(params.get("duration", 3600))
+        video_duration = float(params.get("video_duration", 8))
+        fps = int(params.get("fps", 24))
+        loops = int(duration // video_duration)
+        frame_size = int(video_duration * fps)
+        noise_color = params.get("noise", "brown")
+        return [
+            "ffmpeg", "-y", "-i", input_path,
+            "-filter_complex",
+            f"[0:v]loop=loop={loops}:size={frame_size}:start=0[v];anoisesrc=color={noise_color}:duration={duration}[a]",
+            "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-crf", "23", "-c:a", "aac",
+            output_path
+        ]
+
+    elif action == "audio":
+        noise_color = params.get("noise", "brown")
+        duration = float(params.get("duration", 3600))
+        if params.get("custom_audio"):
+            audio_input = params["custom_audio"]
+            return [
+                "ffmpeg", "-y", "-i", input_path,
+                "-stream_loop", "-1", "-i", audio_input,
+                "-map", "0:v", "-map", "1:a",
+                "-shortest", "-c:v", "copy", "-c:a", "aac",
+                output_path
+            ]
+        else:
+            return [
+                "ffmpeg", "-y", "-i", input_path,
+                "-filter_complex", f"anoisesrc=color={noise_color}:duration={duration}[a]",
+                "-map", "0:v", "-map", "[a]",
+                "-c:v", "copy", "-c:a", "aac",
+                output_path
+            ]
+
+    elif action == "thumbnail":
+        frame_time = params.get("frame_time", 1)
+        text1 = params.get("text1", "").replace("'", "\\'").replace(":", "\\:")
+        text2 = params.get("text2", "").replace("'", "\\'").replace(":", "\\:")
+        font = params.get("font", "C:/Windows/Fonts/arialbd.ttf")
+        color = params.get("color", "white")
+        size1 = params.get("size1", 72)
+        size2 = params.get("size2", 40)
+        vf = f"drawtext=text='{text1}':fontfile='{font}':fontsize={size1}:fontcolor={color}:x=50:y=50:shadowcolor=black:shadowx=3:shadowy=3"
+        if text2:
+            vf += f",drawtext=text='{text2}':fontfile='{font}':fontsize={size2}:fontcolor=yellow:x=50:y={50+size1+10}:shadowcolor=black:shadowx=2:shadowy=2"
+        return [
+            "ffmpeg", "-y", "-ss", str(frame_time), "-i", input_path,
+            "-frames:v", "1", "-vf", vf, "-q:v", "1",
+            output_path
+        ]
+
+    return []
+
+
+async def run_ffmpeg_stream(cmd: list):
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    async for line in process.stderr:
+        decoded = line.decode("utf-8", errors="ignore").strip()
+        if decoded:
+            yield f"data: {json.dumps({'log': decoded})}\n\n"
+    await process.wait()
+    rc = process.returncode
+    if rc == 0:
+        yield f"data: {json.dumps({'status': 'done', 'code': 0})}\n\n"
+    else:
+        yield f"data: {json.dumps({'status': 'error', 'code': rc})}\n\n"
+
+
+@app.post("/api/process")
+async def process_video(request: Request):
+    data = await request.json()
+    action = data.get("action")
+    params = data.get("params", {})
+    cmd = build_ffmpeg_cmd(action, params)
+    if not cmd:
+        return JSONResponse({"error": "Action tidak valid"}, status_code=400)
+    return StreamingResponse(run_ffmpeg_stream(cmd), media_type="text/event-stream")
+
+
+@app.post("/api/process-all")
+async def process_all(request: Request):
+    data = await request.json()
+    input_path = data["input"]
+    output_dir = data["output_dir"]
+    basename = os.path.splitext(os.path.basename(input_path))[0]
+    video_duration = float(data.get("video_duration", 8))
+    fps = int(data.get("fps", 24))
+    target_duration = int(data.get("target_duration", 3600))
+    crop_px = int(data.get("crop_px", 50))
+    noise_color = data.get("noise_color", "brown")
+    do_upscale = data.get("upscale", True)
+
+    step1 = os.path.join(output_dir, f"{basename}_cropped.mp4")
+    step2 = os.path.join(output_dir, f"{basename}_1080p.mp4") if do_upscale else step1
+    step3 = os.path.join(output_dir, f"{basename}_final.mp4")
+    thumb = os.path.join(output_dir, f"{basename}_thumbnail.jpg")
+
+    steps = [
+        build_ffmpeg_cmd("crop", {"input": input_path, "output": step1, "pixels": crop_px}),
+    ]
+    if do_upscale:
+        steps.append(build_ffmpeg_cmd("upscale", {"input": step1, "output": step2}))
+    steps.append(build_ffmpeg_cmd("loop", {
+        "input": step2, "output": step3,
+        "duration": target_duration, "video_duration": video_duration,
+        "fps": fps, "noise": noise_color
+    }))
+    steps.append(build_ffmpeg_cmd("thumbnail", {
+        "input": input_path, "output": thumb,
+        "text1": data.get("thumb_text1", ""),
+        "text2": data.get("thumb_text2", "")
+    }))
+
+    async def run_all():
+        for i, cmd in enumerate(steps):
+            yield f"data: {json.dumps({'step': i+1, 'total': len(steps), 'cmd': ' '.join(cmd[:4])})}\n\n"
+            async for chunk in run_ffmpeg_stream(cmd):
+                yield chunk
+        yield f"data: {json.dumps({'status': 'all_done', 'output': step3, 'thumbnail': thumb})}\n\n"
+
+    return StreamingResponse(run_all(), media_type="text/event-stream")
+
+
+@app.post("/api/open-folder")
+async def open_folder(request: Request):
+    data = await request.json()
+    folder = data.get("folder", "")
+    if not os.path.exists(folder):
+        return JSONResponse({"error": "Folder tidak ditemukan"}, status_code=404)
+    if platform.system() == "Windows":
+        os.startfile(folder)
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", folder])
+    else:
+        subprocess.Popen(["xdg-open", folder])
+    return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
