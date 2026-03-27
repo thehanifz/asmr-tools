@@ -7,6 +7,7 @@ import asyncio
 import os
 import json
 import platform
+import time
 
 app = FastAPI(title="ASMR Video Tool")
 
@@ -106,8 +107,34 @@ async def probe_video(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+def fmt_duration(seconds: float) -> str:
+    """Format detik ke string h:mm:ss"""
+    s = int(seconds)
+    h = s // 3600
+    m = (s % 3600) // 60
+    sec = s % 60
+    if h > 0:
+        return f"{h}j {m:02d}m {sec:02d}s"
+    elif m > 0:
+        return f"{m}m {sec:02d}s"
+    else:
+        return f"{sec}s"
+
+
+def get_file_size_str(path: str) -> str:
+    try:
+        size = os.path.getsize(path)
+        if size >= 1024**3:
+            return f"{size/1024**3:.2f} GB"
+        elif size >= 1024**2:
+            return f"{size/1024**2:.1f} MB"
+        else:
+            return f"{size/1024:.0f} KB"
+    except:
+        return "?"
+
+
 def escape_font_path(path: str) -> str:
-    """Escape font path untuk FFmpeg filter di Windows."""
     path = path.replace("\\", "/")
     if len(path) >= 2 and path[1] == ":":
         path = path[0] + "\\:" + path[2:]
@@ -144,7 +171,6 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
         fps = float(params.get("fps", 24))
         noise_color = params.get("noise", "brown")
         mode = params.get("mode", "hq")
-
         frame_size = round(video_duration * fps)
         loops = max(1, int(duration // video_duration) + 1)
 
@@ -220,88 +246,50 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
     return []
 
 
-def build_loop_v2_steps(params: dict) -> list:
-    """
-    Loop V2 - 4 step pipeline:
-    1. Loop video (stream_loop + -c:v copy, buang audio)
-    2. Extract audio asli ke WAV
-    3. Loop audio 1 jam + crossfade di loop point
-    4. Mux video 1 jam + audio 1 jam
-    """
+def build_loop_v2_steps(params: dict):
     input_path = params["input"]
     output_path = params["output"]
     duration = int(params.get("duration", 3600))
     video_duration = float(params.get("video_duration", 8))
     crossfade = float(params.get("crossfade", 0.3))
-
     loops = max(1, int(duration / video_duration) + 10)
 
     out_dir = os.path.dirname(output_path)
     base = os.path.splitext(os.path.basename(input_path))[0]
-    sep = os.sep
 
     video_1h = os.path.join(out_dir, f"{base}_video_1h.mp4")
     audio_wav = os.path.join(out_dir, f"{base}_audio.wav")
-    audio_1h = os.path.join(out_dir, f"{base}_audio_1h.m4a")
+    audio_1h  = os.path.join(out_dir, f"{base}_audio_1h.m4a")
 
     fade_out_start = duration - crossfade
 
-    step1 = [
-        "ffmpeg", "-y",
-        "-stream_loop", str(loops), "-i", input_path,
-        "-t", str(duration),
-        "-an", "-c:v", "copy",
-        video_1h
-    ]
-
-    step2 = [
-        "ffmpeg", "-y",
-        "-i", input_path,
-        "-vn", "-acodec", "pcm_s16le",
-        audio_wav
-    ]
-
-    step3 = [
-        "ffmpeg", "-y",
-        "-stream_loop", "-1", "-i", audio_wav,
-        "-filter_complex",
-        f"atrim=duration={duration},asetpts=PTS-STARTPTS,"
-        f"afade=t=in:st=0:d={crossfade},"
-        f"afade=t=out:st={fade_out_start}:d={crossfade}",
-        "-c:a", "aac", "-b:a", "192k",
-        audio_1h
-    ]
-
-    step4 = [
-        "ffmpeg", "-y",
-        "-i", video_1h, "-i", audio_1h,
-        "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "copy",
-        "-shortest",
-        output_path
-    ]
+    step1 = ["ffmpeg", "-y", "-stream_loop", str(loops), "-i", input_path,
+              "-t", str(duration), "-an", "-c:v", "copy", video_1h]
+    step2 = ["ffmpeg", "-y", "-i", input_path,
+              "-vn", "-acodec", "pcm_s16le", audio_wav]
+    step3 = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", audio_wav,
+              "-filter_complex",
+              f"atrim=duration={duration},asetpts=PTS-STARTPTS,"
+              f"afade=t=in:st=0:d={crossfade},"
+              f"afade=t=out:st={fade_out_start}:d={crossfade}",
+              "-c:a", "aac", "-b:a", "192k", audio_1h]
+    step4 = ["ffmpeg", "-y", "-i", video_1h, "-i", audio_1h,
+              "-map", "0:v:0", "-map", "1:a:0",
+              "-c:v", "copy", "-c:a", "copy", "-shortest", output_path]
 
     return [step1, step2, step3, step4], {
-        "video_1h": video_1h,
-        "audio_wav": audio_wav,
-        "audio_1h": audio_1h
+        "video_1h": video_1h, "audio_wav": audio_wav, "audio_1h": audio_1h
     }
 
 
 async def run_ffmpeg_stream(cmd: list):
-    """
-    Baca stderr FFmpeg per CHUNK (bukan per line) untuk menghindari
-    LimitOverrunError saat FFmpeg output baris sangat panjang (>64KB).
-    Buffer dikumpulkan dan dipecah per newline secara manual.
-    """
-    limit = 10 * 1024 * 1024  # 10 MB
+    limit = 10 * 1024 * 1024
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         limit=limit
     )
-
     leftover = b""
     while True:
         try:
@@ -317,12 +305,10 @@ async def run_ffmpeg_stream(cmd: list):
             decoded = line.decode("utf-8", errors="ignore").strip()
             if decoded:
                 yield f"data: {json.dumps({'log': decoded})}\n\n"
-
     if leftover:
         decoded = leftover.decode("utf-8", errors="ignore").strip()
         if decoded:
             yield f"data: {json.dumps({'log': decoded})}\n\n"
-
     await process.wait()
     rc = process.returncode
     if rc == 0:
@@ -344,39 +330,41 @@ async def process_video(request: Request):
 
 @app.post("/api/loop-v2")
 async def loop_v2(request: Request):
-    """
-    Loop V2: 4-step pipeline
-    - Step 1: Loop video (copy, tanpa encode)
-    - Step 2: Extract audio asli ke WAV
-    - Step 3: Loop audio + crossfade
-    - Step 4: Mux video + audio
-    """
     data = await request.json()
     params = data.get("params", {})
     steps, tmp_files = build_loop_v2_steps(params)
     step_labels = [
-        "Loop video (copy)",
-        "Extract audio WAV",
-        "Loop audio + crossfade",
-        "Mux video + audio"
+        "Loop video (copy, tanpa re-encode)",
+        "Extract audio asli → WAV",
+        "Loop audio + crossfade (AAC 192k)",
+        "Mux video + audio → final"
     ]
 
     async def run_v2():
+        total_start = time.time()
         for i, cmd in enumerate(steps):
-            yield f"data: {json.dumps({'step': i+1, 'total': len(steps), 'label': step_labels[i], 'cmd': ' '.join(cmd[:5])})}\n\n"
+            t_start = time.time()
+            out_file = cmd[-1]
+            yield f"data: {json.dumps({'step': i+1, 'total': len(steps), 'label': step_labels[i], 'cmd': ' '.join(cmd[:6]), 'timing': 'start'})}\n\n"
             error_occurred = False
             async for chunk in run_ffmpeg_stream(cmd):
-                d = json.loads(chunk[6:])  # strip 'data: '
+                d = json.loads(chunk[6:])
                 if d.get('status') == 'error':
                     error_occurred = True
                     yield chunk
                     break
                 yield chunk
+            elapsed = time.time() - t_start
+            size_str = get_file_size_str(out_file) if os.path.exists(out_file) else "?"
             if error_occurred:
-                yield f"data: {json.dumps({'status': 'error', 'step': i+1})}\n\n"
+                yield f"data: {json.dumps({'status': 'error', 'step': i+1, 'label': step_labels[i]})}\n\n"
                 return
+            yield f"data: {json.dumps({'step_done': i+1, 'label': step_labels[i], 'elapsed': fmt_duration(elapsed), 'output_file': os.path.basename(out_file), 'output_size': size_str})}\n\n"
+
+        total_elapsed = time.time() - total_start
         output = params.get('output', '')
-        yield f"data: {json.dumps({'status': 'all_done', 'output': output, 'tmp': tmp_files})}\n\n"
+        final_size = get_file_size_str(output) if os.path.exists(output) else "?"
+        yield f"data: {json.dumps({'status': 'all_done', 'output': output, 'final_size': final_size, 'total_elapsed': fmt_duration(total_elapsed), 'tmp': tmp_files})}\n\n"
 
     return StreamingResponse(run_v2(), media_type="text/event-stream")
 
@@ -384,54 +372,114 @@ async def loop_v2(request: Request):
 @app.post("/api/process-all")
 async def process_all(request: Request):
     data = await request.json()
-    input_path = data["input"]
-    output_dir = data["output_dir"]
-    basename = os.path.splitext(os.path.basename(input_path))[0]
-    video_duration = float(data.get("video_duration", 8))
-    fps = float(data.get("fps", 24))
+    input_path  = data["input"]
+    output_dir  = data["output_dir"]
+    basename    = os.path.splitext(os.path.basename(input_path))[0]
+    video_duration  = float(data.get("video_duration", 8))
+    fps             = float(data.get("fps", 24))
     target_duration = int(data.get("target_duration", 3600))
-    crop_px = int(data.get("crop_px", 50))
+    crop_px     = int(data.get("crop_px", 50))
     noise_color = data.get("noise_color", "brown")
-    do_upscale = data.get("upscale", True)
-    loop_mode = data.get("loop_mode", "hq")  # hq | fast | v2
+    do_upscale  = data.get("upscale", True)
+    loop_mode   = data.get("loop_mode", "v2")
+    crossfade   = float(data.get("crossfade", 0.3))
 
-    step1 = os.path.join(output_dir, f"{basename}_cropped.mp4")
-    step2 = os.path.join(output_dir, f"{basename}_1080p.mp4") if do_upscale else step1
-    step3 = os.path.join(output_dir, f"{basename}_final.mp4")
-    thumb = os.path.join(output_dir, f"{basename}_thumbnail.jpg")
+    cropped = os.path.join(output_dir, f"{basename}_cropped.mp4")
+    upscaled = os.path.join(output_dir, f"{basename}_1080p.mp4") if do_upscale else cropped
+    final   = os.path.join(output_dir, f"{basename}_final.mp4")
+    thumb   = os.path.join(output_dir, f"{basename}_thumbnail.jpg")
 
-    steps = [
-        build_ffmpeg_cmd("crop", {"input": input_path, "output": step1, "pixels": crop_px}),
-    ]
+    # ── Build step list dengan label deskriptif ──
+    steps = []
+    step_labels = []
+    step_outputs = []
+
+    # Step: Crop
+    steps.append(build_ffmpeg_cmd("crop", {"input": input_path, "output": cropped, "pixels": crop_px}))
+    step_labels.append(f"✂️  Crop watermark {crop_px}px dari bawah")
+    step_outputs.append(cropped)
+
+    # Step: Upscale (optional)
     if do_upscale:
-        steps.append(build_ffmpeg_cmd("upscale", {"input": step1, "output": step2}))
+        steps.append(build_ffmpeg_cmd("upscale", {"input": cropped, "output": upscaled}))
+        step_labels.append("⬆️  Upscale ke 1080p (lanczos, crf 18)")
+        step_outputs.append(upscaled)
 
+    # Step: Loop V2 (4 sub-steps) atau mode lain
     if loop_mode == "v2":
-        v2_steps, _ = build_loop_v2_steps({
-            "input": step2, "output": step3,
+        v2_steps, tmp_files = build_loop_v2_steps({
+            "input": upscaled, "output": final,
             "duration": target_duration,
             "video_duration": video_duration,
+            "crossfade": crossfade
         })
+        v2_labels = [
+            f"🔁  Loop video copy ({fmt_duration(target_duration)})",
+            "🎧  Extract audio asli → WAV",
+            f"🌀  Loop audio + crossfade {crossfade}s",
+            "🔧  Mux video + audio → final"
+        ]
+        v2_outputs = [tmp_files["video_1h"], tmp_files["audio_wav"], tmp_files["audio_1h"], final]
         steps.extend(v2_steps)
+        step_labels.extend(v2_labels)
+        step_outputs.extend(v2_outputs)
     else:
         steps.append(build_ffmpeg_cmd("loop", {
-            "input": step2, "output": step3,
+            "input": upscaled, "output": final,
             "duration": target_duration, "video_duration": video_duration,
             "fps": fps, "noise": noise_color, "mode": loop_mode
         }))
+        step_labels.append(f"🔁  Loop {loop_mode} → {fmt_duration(target_duration)}")
+        step_outputs.append(final)
 
+    # Step: Thumbnail
     steps.append(build_ffmpeg_cmd("thumbnail", {
         "input": input_path, "output": thumb,
         "text1": data.get("thumb_text1", ""),
         "text2": data.get("thumb_text2", "")
     }))
+    step_labels.append("🖼️  Extract thumbnail")
+    step_outputs.append(thumb)
+
+    total_steps = len(steps)
 
     async def run_all():
+        total_start = time.time()
+        input_size  = get_file_size_str(input_path)
+        target_str  = fmt_duration(target_duration)
+
+        yield f"data: {json.dumps({'type': 'pipeline_start', 'total_steps': total_steps, 'input': os.path.basename(input_path), 'input_size': input_size, 'target': target_str, 'loop_mode': loop_mode})}\n\n"
+
         for i, cmd in enumerate(steps):
-            yield f"data: {json.dumps({'step': i+1, 'total': len(steps), 'cmd': ' '.join(cmd[:4])})}\n\n"
+            t_start   = time.time()
+            label     = step_labels[i]
+            out_file  = step_outputs[i]
+
+            yield f"data: {json.dumps({'type': 'step_start', 'step': i+1, 'total': total_steps, 'label': label, 'cmd': ' '.join(cmd[:6])})}\n\n"
+
+            error_occurred = False
             async for chunk in run_ffmpeg_stream(cmd):
+                d = json.loads(chunk[6:])
+                if d.get('status') == 'error':
+                    error_occurred = True
+                    yield chunk
+                    break
                 yield chunk
-        yield f"data: {json.dumps({'status': 'all_done', 'output': step3, 'thumbnail': thumb})}\n\n"
+
+            elapsed  = time.time() - t_start
+            size_str = get_file_size_str(out_file) if os.path.exists(out_file) else "?"
+
+            if error_occurred:
+                yield f"data: {json.dumps({'type': 'step_error', 'step': i+1, 'label': label, 'elapsed': fmt_duration(elapsed)})}\n\n"
+                return
+
+            yield f"data: {json.dumps({'type': 'step_done', 'step': i+1, 'total': total_steps, 'label': label, 'elapsed': fmt_duration(elapsed), 'output_file': os.path.basename(out_file), 'output_size': size_str})}\n\n"
+
+        total_elapsed = time.time() - total_start
+        final_size    = get_file_size_str(final) if os.path.exists(final) else "?"
+        thumb_size    = get_file_size_str(thumb) if os.path.exists(thumb) else "?"
+
+        yield f"data: {json.dumps({'status': 'all_done', 'output': final, 'thumbnail': thumb, 'final_size': final_size, 'thumb_size': thumb_size, 'total_elapsed': fmt_duration(total_elapsed)})}\n\n"
 
     return StreamingResponse(run_all(), media_type="text/event-stream")
 
