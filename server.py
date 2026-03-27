@@ -26,7 +26,7 @@ async def root():
         return f.read()
 
 
-# ── BUG FIX #1: Browse dialog via tkinter ──────────────────────
+# ── Browse dialog via tkinter ───────────────────────────────────
 @app.get("/api/browse")
 async def browse_file():
     try:
@@ -106,6 +106,20 @@ async def probe_video(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+def escape_font_path(path: str) -> str:
+    """
+    FFmpeg drawtext fontfile di Windows: drive letter 'C:' harus di-escape jadi 'C\\:'
+    Backslash path juga perlu diganti forward slash.
+    """
+    # Ganti backslash ke forward slash
+    path = path.replace("\\", "/")
+    # Escape colon pada drive letter: C:/ -> C\:/
+    # Hanya escape colon pertama (drive letter), bukan yang lain
+    if len(path) >= 2 and path[1] == ":":
+        path = path[0] + "\\:" + path[2:]
+    return path
+
+
 def build_ffmpeg_cmd(action: str, params: dict) -> list:
     input_path = params["input"]
     output_path = params["output"]
@@ -133,18 +147,36 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
     elif action == "loop":
         duration = int(params.get("duration", 3600))
         video_duration = float(params.get("video_duration", 8))
-        fps = int(params.get("fps", 24))
-        loops = int(duration // video_duration)
-        frame_size = int(video_duration * fps)
+        fps = float(params.get("fps", 24))
         noise_color = params.get("noise", "brown")
-        return [
-            "ffmpeg", "-y", "-i", input_path,
-            "-filter_complex",
-            f"[0:v]loop=loop={loops}:size={frame_size}:start=0[v];anoisesrc=color={noise_color}:duration={duration}[a]",
-            "-map", "[v]", "-map", "[a]",
-            "-c:v", "libx264", "-crf", "23", "-c:a", "aac",
-            output_path
-        ]
+        mode = params.get("mode", "hq")
+
+        # Hitung jumlah loop dan frame size secara akurat
+        frame_size = round(video_duration * fps)
+        loops = max(1, int(duration // video_duration) + 1)  # +1 untuk buffer
+
+        if mode == "fast":
+            # Fast: copy video stream, generate audio noise
+            return [
+                "ffmpeg", "-y",
+                "-stream_loop", str(loops), "-i", input_path,
+                "-filter_complex", f"anoisesrc=color={noise_color}:duration={duration}[a]",
+                "-map", "0:v", "-map", "[a]",
+                "-t", str(duration),
+                "-c:v", "copy", "-c:a", "aac",
+                output_path
+            ]
+        else:
+            # HQ: re-encode dengan loop filter
+            return [
+                "ffmpeg", "-y", "-i", input_path,
+                "-filter_complex",
+                f"[0:v]loop=loop={loops}:size={frame_size}:start=0[v];anoisesrc=color={noise_color}:duration={duration}[a]",
+                "-map", "[v]", "-map", "[a]",
+                "-t", str(duration),
+                "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "aac",
+                output_path
+            ]
 
     elif action == "audio":
         noise_color = params.get("noise", "brown")
@@ -169,15 +201,26 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
 
     elif action == "thumbnail":
         frame_time = params.get("frame_time", 1)
-        text1 = params.get("text1", "").replace("'", "\\'").replace(":", "\\:")
-        text2 = params.get("text2", "").replace("'", "\\'").replace(":", "\\:")
-        font = params.get("font", "C:/Windows/Fonts/arialbd.ttf")
+        # Escape special chars untuk FFmpeg filter
+        def esc(s):
+            return s.replace("\\", "/").replace("'", "\\'").replace(":", "\\:").replace(",", "\\,")
+
+        text1 = esc(params.get("text1", ""))
+        text2 = esc(params.get("text2", ""))
+        raw_font = params.get("font", "C:/Windows/Fonts/arialbd.ttf")
+        font = escape_font_path(raw_font)
         color = params.get("color", "white")
         size1 = params.get("size1", 72)
         size2 = params.get("size2", 40)
-        vf = f"drawtext=text='{text1}':fontfile='{font}':fontsize={size1}:fontcolor={color}:x=50:y=50:shadowcolor=black:shadowx=3:shadowy=3"
-        if text2:
-            vf += f",drawtext=text='{text2}':fontfile='{font}':fontsize={size2}:fontcolor=yellow:x=50:y={50+size1+10}:shadowcolor=black:shadowx=2:shadowy=2"
+
+        if text1:
+            vf = f"drawtext=text='{text1}':fontfile='{font}':fontsize={size1}:fontcolor={color}:x=50:y=50:shadowcolor=black:shadowx=3:shadowy=3"
+            if text2:
+                vf += f",drawtext=text='{text2}':fontfile='{font}':fontsize={size2}:fontcolor=yellow:x=50:y={50+size1+10}:shadowcolor=black:shadowx=2:shadowy=2"
+        else:
+            # Tanpa teks, extract frame saja
+            vf = "scale=iw:ih"
+
         return [
             "ffmpeg", "-y", "-ss", str(frame_time), "-i", input_path,
             "-frames:v", "1", "-vf", vf, "-q:v", "1",
@@ -223,7 +266,7 @@ async def process_all(request: Request):
     output_dir = data["output_dir"]
     basename = os.path.splitext(os.path.basename(input_path))[0]
     video_duration = float(data.get("video_duration", 8))
-    fps = int(data.get("fps", 24))
+    fps = float(data.get("fps", 24))
     target_duration = int(data.get("target_duration", 3600))
     crop_px = int(data.get("crop_px", 50))
     noise_color = data.get("noise_color", "brown")
@@ -242,7 +285,7 @@ async def process_all(request: Request):
     steps.append(build_ffmpeg_cmd("loop", {
         "input": step2, "output": step3,
         "duration": target_duration, "video_duration": video_duration,
-        "fps": fps, "noise": noise_color
+        "fps": fps, "noise": noise_color, "mode": "hq"
     }))
     steps.append(build_ffmpeg_cmd("thumbnail", {
         "input": input_path, "output": thumb,

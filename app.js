@@ -1,13 +1,13 @@
-// ── STATE ─────────────────────────────────────────────────────
+// ── STATE ────────────────────────────────────────────────────────
 let fileInfo = {};
 let lastOutputFolder = '';
 let pipelineState = {
-  original: '',       // path file asli pertama kali di-load
-  lastOutput: '',     // output terakhir dari step sebelumnya
-  chain: []           // history step: [{step, output}]
+  original: '',
+  lastOutput: '',
+  chain: []
 };
 
-// ── DRAG & DROP ──────────────────────────────────────────────
+// ── DRAG & DROP ──────────────────────────────────────────────────
 const dropZone = document.getElementById('drop-zone');
 
 dropZone.addEventListener('dragover', e => {
@@ -17,15 +17,12 @@ dropZone.addEventListener('dragover', e => {
 
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 
-// Bug Fix #2: drag & drop di browser tidak bisa dapat full path
-// Tampilkan nama file + instruksi pakai Browse untuk path lengkap
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('dragover');
   const file = e.dataTransfer.files[0];
   if (file) {
     const pathInput = document.getElementById('file-path');
-    // Electron expose file.path, browser biasa tidak
     if (file.path && file.path.includes(os_sep())) {
       pathInput.value = file.path;
       probeVideo();
@@ -41,7 +38,7 @@ function os_sep() {
   return navigator.platform.includes('Win') ? '\\' : '/';
 }
 
-// ── BUG FIX #1: BROWSE FILE via tkinter dialog ───────────────
+// ── BROWSE FILE via tkinter dialog ──────────────────────────────
 async function browseFile() {
   try {
     const res = await fetch('/api/browse');
@@ -76,8 +73,9 @@ async function browseOutputFolder(targetId) {
             'loop-output': `${sep}${base}_loop.mp4`,
             'audio-output': `${sep}${base}_audio.mp4`,
             'thumb-output': `${sep}${base}_thumbnail.jpg`,
+            'audio-custom-path': '',
           };
-          el.value = data.path + (suffixMap[targetId] || '');
+          el.value = data.path + (suffixMap[targetId] !== undefined ? suffixMap[targetId] : '');
         }
         lastOutputFolder = data.path;
       }
@@ -87,7 +85,7 @@ async function browseOutputFolder(targetId) {
   }
 }
 
-// ── PROBE VIDEO ──────────────────────────────────────────────
+// ── PROBE VIDEO ──────────────────────────────────────────────────
 async function probeVideo() {
   const path = document.getElementById('file-path').value.trim();
   if (!path) return alert('Masukkan path video dulu!');
@@ -102,7 +100,6 @@ async function probeVideo() {
     if (data.error) return setLog('❌ ' + data.error);
     fileInfo = { ...data, path };
 
-    // Reset pipeline state saat load file baru
     pipelineState = { original: path, lastOutput: path, chain: [] };
     updatePipelineIndicator();
 
@@ -134,14 +131,11 @@ function autoFillOutputs(inputPath) {
   lastOutputFolder = dir;
 }
 
-// ── BUG FIX #3: PIPELINE STATE MANAGER ───────────────────────
+// ── PIPELINE STATE MANAGER ───────────────────────────────────────
 function updatePipelineIndicator() {
   const el = document.getElementById('pipeline-indicator');
   if (!el) return;
-  if (!pipelineState.lastOutput) {
-    el.classList.add('hidden');
-    return;
-  }
+  if (!pipelineState.lastOutput) { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
   const fname = pipelineState.lastOutput.split('\\').pop().split('/').pop();
   const isOriginal = pipelineState.lastOutput === pipelineState.original;
@@ -162,7 +156,6 @@ function setLastOutput(outputPath, stepName) {
   pipelineState.lastOutput = outputPath;
   pipelineState.chain.push({ step: stepName, output: outputPath });
   updatePipelineIndicator();
-  // Auto-update input di semua tab output fields jika file ada di folder yang sama
   const sep = os_sep();
   const dir = outputPath.includes(sep)
     ? outputPath.substring(0, outputPath.lastIndexOf(sep))
@@ -170,7 +163,7 @@ function setLastOutput(outputPath, stepName) {
   lastOutputFolder = dir;
 }
 
-// ── TABS ─────────────────────────────────────────────────────
+// ── TABS ─────────────────────────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
@@ -178,7 +171,7 @@ function switchTab(name) {
   event.target.classList.add('active');
 }
 
-// ── DURATION LABEL ───────────────────────────────────────────
+// ── DURATION LABEL ───────────────────────────────────────────────
 document.getElementById('loop-duration').addEventListener('input', function() {
   const sec = parseInt(this.value) || 0;
   const h = Math.floor(sec / 3600);
@@ -191,15 +184,14 @@ function setDuration(sec) {
   document.getElementById('loop-duration').dispatchEvent(new Event('input'));
 }
 
-// ── AUDIO CUSTOM TOGGLE ──────────────────────────────────────
+// ── AUDIO CUSTOM TOGGLE ──────────────────────────────────────────
 document.getElementById('audio-noise').addEventListener('change', function() {
   document.getElementById('audio-custom-row').classList.toggle('hidden', this.value !== 'custom');
 });
 
-// ── RUN SINGLE PROCESS ───────────────────────────────────────
+// ── RUN SINGLE PROCESS ───────────────────────────────────────────
 async function runProcess(action) {
   if (!pipelineState.lastOutput && !fileInfo.path) return alert('Load video dulu!');
-  // Bug Fix #3: gunakan lastOutput dari pipeline, bukan selalu input original
   const input = pipelineState.lastOutput || fileInfo.path;
   let params = { input };
 
@@ -217,6 +209,8 @@ async function runProcess(action) {
     params.video_duration = fileInfo.duration || 8;
     params.fps = fileInfo.fps || 24;
     params.noise = 'brown';
+    // Kirim mode ke backend: fast atau hq
+    params.mode = document.getElementById('loop-mode').value;
   } else if (action === 'audio') {
     params.output = document.getElementById('audio-output').value;
     params.noise = document.getElementById('audio-noise').value;
@@ -225,7 +219,7 @@ async function runProcess(action) {
       params.custom_audio = document.getElementById('audio-custom-path').value;
     }
   } else if (action === 'thumbnail') {
-    // Thumbnail selalu dari file original agar ambil frame yang bersih
+    // Thumbnail dari file original
     params.input = pipelineState.original || fileInfo.path;
     params.output = document.getElementById('thumb-output').value;
     params.text1 = document.getElementById('thumb-text1').value;
@@ -239,11 +233,12 @@ async function runProcess(action) {
 
   const outputPath = params.output;
   startStream('/api/process', { action, params }, () => {
-    setLastOutput(outputPath, action);
+    // Thumbnail tidak masuk pipeline chain
+    if (action !== 'thumbnail') setLastOutput(outputPath, action);
   });
 }
 
-// ── RUN ALL IN ONE ───────────────────────────────────────────
+// ── RUN ALL IN ONE ───────────────────────────────────────────────
 async function runProcessAll() {
   if (!fileInfo.path) return alert('Load video dulu!');
   const body = {
@@ -262,7 +257,7 @@ async function runProcessAll() {
   startStream('/api/process-all', body);
 }
 
-// ── SSE STREAM ───────────────────────────────────────────────
+// ── SSE STREAM ───────────────────────────────────────────────────
 function startStream(endpoint, body, onDoneCallback) {
   clearLog();
   setProgress(0, '⏳ Memulai proses...');
@@ -326,7 +321,7 @@ function handleStreamData(d, onDoneCallback) {
   }
 }
 
-// ── OPEN FOLDER ──────────────────────────────────────────────
+// ── OPEN FOLDER ──────────────────────────────────────────────────
 async function openFolder() {
   await fetch('/api/open-folder', {
     method: 'POST',
@@ -335,7 +330,7 @@ async function openFolder() {
   });
 }
 
-// ── LOG HELPERS ──────────────────────────────────────────────
+// ── LOG HELPERS ──────────────────────────────────────────────────
 function setLog(msg) {
   const box = document.getElementById('log-box');
   box.textContent = msg;
