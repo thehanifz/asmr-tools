@@ -26,6 +26,47 @@ async def root():
         return f.read()
 
 
+# ── BUG FIX #1: Browse dialog via tkinter ──────────────────────
+@app.get("/api/browse")
+async def browse_file():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.wm_attributes('-topmost', True)
+        file_path = filedialog.askopenfilename(
+            title="Pilih Video",
+            filetypes=[
+                ("Video files", "*.mp4 *.mov *.avi *.mkv *.webm"),
+                ("All files", "*.*")
+            ]
+        )
+        root.destroy()
+        if file_path:
+            return {"path": file_path.replace("/", os.sep)}
+        return {"path": ""}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/browse-folder")
+async def browse_folder():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.wm_attributes('-topmost', True)
+        folder_path = filedialog.askdirectory(title="Pilih Output Folder")
+        root.destroy()
+        if folder_path:
+            return {"path": folder_path.replace("/", os.sep)}
+        return {"path": ""}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.post("/api/probe")
 async def probe_video(request: Request):
     data = await request.json()
@@ -79,10 +120,12 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
         ]
 
     elif action == "upscale":
+        algo = params.get("algo", "lanczos")
+        crf = params.get("crf", 18)
         return [
             "ffmpeg", "-y", "-i", input_path,
-            "-vf", "scale=1920:1080:flags=lanczos",
-            "-c:v", "libx264", "-crf", "18", "-preset", "slow",
+            "-vf", f"scale=1920:1080:flags={algo}",
+            "-c:v", "libx264", "-crf", str(crf), "-preset", "slow",
             "-c:a", "copy",
             output_path
         ]

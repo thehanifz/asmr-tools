@@ -61,7 +61,7 @@ main {
 #drop-zone {
   border: 2px dashed var(--border);
   border-radius: var(--radius);
-  padding: 24px 16px;
+  padding: 20px 16px;
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s;
@@ -70,7 +70,84 @@ main {
 #drop-zone .drop-icon { font-size: 2.5rem; margin-bottom: 8px; }
 #drop-zone p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px; }
 #drop-zone span { color: var(--text-muted); font-size: 0.8rem; display: block; margin-bottom: 8px; }
-#drop-zone input[type=text] { width: 100%; }
+
+/* BROWSE BUTTON */
+.btn-browse {
+  width: 100%;
+  padding: 10px;
+  background: var(--accent2);
+  border: 1px solid var(--accent);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  transition: all 0.2s;
+}
+.btn-browse:hover { background: var(--accent); }
+
+.path-row {
+  display: flex;
+  gap: 6px;
+}
+.path-row input { flex: 1; }
+.btn-load {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.btn-load:hover { border-color: var(--accent); color: var(--accent); }
+
+/* PIPELINE INDICATOR */
+.pipeline-indicator {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pipeline-indicator button {
+  background: transparent;
+  border: 1px solid var(--green);
+  color: var(--green);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.pipeline-indicator button:hover { background: var(--green); color: black; }
+
+/* INPUT BROWSE ROW */
+.input-browse-row {
+  display: flex;
+  gap: 6px;
+}
+.input-browse-row input { flex: 1; }
+.input-browse-row button {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.input-browse-row button:hover { border-color: var(--accent); }
 
 /* FILE INFO */
 #file-info { margin-top: 16px; }

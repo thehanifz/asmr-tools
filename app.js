@@ -1,5 +1,11 @@
+// ── STATE ─────────────────────────────────────────────────────
 let fileInfo = {};
 let lastOutputFolder = '';
+let pipelineState = {
+  original: '',       // path file asli pertama kali di-load
+  lastOutput: '',     // output terakhir dari step sebelumnya
+  chain: []           // history step: [{step, output}]
+};
 
 // ── DRAG & DROP ──────────────────────────────────────────────
 const dropZone = document.getElementById('drop-zone');
@@ -11,15 +17,75 @@ dropZone.addEventListener('dragover', e => {
 
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 
+// Bug Fix #2: drag & drop di browser tidak bisa dapat full path
+// Tampilkan nama file + instruksi pakai Browse untuk path lengkap
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('dragover');
   const file = e.dataTransfer.files[0];
   if (file) {
-    document.getElementById('file-path').value = file.path || file.name;
-    probeVideo();
+    const pathInput = document.getElementById('file-path');
+    // Electron expose file.path, browser biasa tidak
+    if (file.path && file.path.includes(os_sep())) {
+      pathInput.value = file.path;
+      probeVideo();
+    } else {
+      pathInput.value = file.name;
+      pathInput.style.borderColor = '#e94560';
+      setLog('⚠️ Drag & Drop hanya mendapat nama file. Gunakan tombol 📂 Browse untuk memilih file dengan full path.');
+    }
   }
 });
+
+function os_sep() {
+  return navigator.platform.includes('Win') ? '\\' : '/';
+}
+
+// ── BUG FIX #1: BROWSE FILE via tkinter dialog ───────────────
+async function browseFile() {
+  try {
+    const res = await fetch('/api/browse');
+    const data = await res.json();
+    if (data.error) return setLog('❌ Browse error: ' + data.error);
+    if (data.path) {
+      document.getElementById('file-path').value = data.path;
+      document.getElementById('file-path').style.borderColor = '';
+      probeVideo();
+    }
+  } catch (err) {
+    setLog('❌ Browse gagal: ' + err.message);
+  }
+}
+
+async function browseOutputFolder(targetId) {
+  try {
+    const res = await fetch('/api/browse-folder');
+    const data = await res.json();
+    if (data.error) return setLog('❌ Browse folder error: ' + data.error);
+    if (data.path && targetId) {
+      const el = document.getElementById(targetId);
+      if (el) {
+        const base = (fileInfo.filename || 'video').replace(/\.[^.]+$/, '');
+        const sep = os_sep();
+        if (targetId === 'all-output-dir') {
+          el.value = data.path;
+        } else {
+          const suffixMap = {
+            'crop-output': `${sep}${base}_cropped.mp4`,
+            'upscale-output': `${sep}${base}_1080p.mp4`,
+            'loop-output': `${sep}${base}_loop.mp4`,
+            'audio-output': `${sep}${base}_audio.mp4`,
+            'thumb-output': `${sep}${base}_thumbnail.jpg`,
+          };
+          el.value = data.path + (suffixMap[targetId] || '');
+        }
+        lastOutputFolder = data.path;
+      }
+    }
+  } catch (err) {
+    setLog('❌ Browse folder gagal: ' + err.message);
+  }
+}
 
 // ── PROBE VIDEO ──────────────────────────────────────────────
 async function probeVideo() {
@@ -35,6 +101,11 @@ async function probeVideo() {
     const data = await res.json();
     if (data.error) return setLog('❌ ' + data.error);
     fileInfo = { ...data, path };
+
+    // Reset pipeline state saat load file baru
+    pipelineState = { original: path, lastOutput: path, chain: [] };
+    updatePipelineIndicator();
+
     document.getElementById('info-name').textContent = data.filename;
     document.getElementById('info-duration').textContent = data.duration_str;
     document.getElementById('info-res').textContent = data.resolution;
@@ -49,16 +120,53 @@ async function probeVideo() {
 }
 
 function autoFillOutputs(inputPath) {
-  const dir = inputPath.includes('\\') 
-    ? inputPath.substring(0, inputPath.lastIndexOf('\\'))
+  const sep = os_sep();
+  const dir = inputPath.includes(sep)
+    ? inputPath.substring(0, inputPath.lastIndexOf(sep))
     : inputPath.substring(0, inputPath.lastIndexOf('/'));
   const base = (fileInfo.filename || 'video').replace(/\.[^.]+$/, '');
-  document.getElementById('crop-output').value = `${dir}\\${base}_cropped.mp4`;
-  document.getElementById('upscale-output').value = `${dir}\\${base}_1080p.mp4`;
-  document.getElementById('loop-output').value = `${dir}\\${base}_loop.mp4`;
-  document.getElementById('audio-output').value = `${dir}\\${base}_audio.mp4`;
-  document.getElementById('thumb-output').value = `${dir}\\${base}_thumbnail.jpg`;
+  document.getElementById('crop-output').value = `${dir}${sep}${base}_cropped.mp4`;
+  document.getElementById('upscale-output').value = `${dir}${sep}${base}_1080p.mp4`;
+  document.getElementById('loop-output').value = `${dir}${sep}${base}_loop.mp4`;
+  document.getElementById('audio-output').value = `${dir}${sep}${base}_audio.mp4`;
+  document.getElementById('thumb-output').value = `${dir}${sep}${base}_thumbnail.jpg`;
   document.getElementById('all-output-dir').value = dir;
+  lastOutputFolder = dir;
+}
+
+// ── BUG FIX #3: PIPELINE STATE MANAGER ───────────────────────
+function updatePipelineIndicator() {
+  const el = document.getElementById('pipeline-indicator');
+  if (!el) return;
+  if (!pipelineState.lastOutput) {
+    el.classList.add('hidden');
+    return;
+  }
+  el.classList.remove('hidden');
+  const fname = pipelineState.lastOutput.split('\\').pop().split('/').pop();
+  const isOriginal = pipelineState.lastOutput === pipelineState.original;
+  el.innerHTML = `
+    <span>🎯 Input aktif: <strong>${fname}</strong></span>
+    ${!isOriginal ? `<button onclick="resetPipeline()" title="Reset ke file original">↩ Reset</button>` : ''}
+  `;
+}
+
+function resetPipeline() {
+  pipelineState.lastOutput = pipelineState.original;
+  pipelineState.chain = [];
+  updatePipelineIndicator();
+  setLog('↩ Pipeline direset ke file original: ' + pipelineState.original);
+}
+
+function setLastOutput(outputPath, stepName) {
+  pipelineState.lastOutput = outputPath;
+  pipelineState.chain.push({ step: stepName, output: outputPath });
+  updatePipelineIndicator();
+  // Auto-update input di semua tab output fields jika file ada di folder yang sama
+  const sep = os_sep();
+  const dir = outputPath.includes(sep)
+    ? outputPath.substring(0, outputPath.lastIndexOf(sep))
+    : outputPath.substring(0, outputPath.lastIndexOf('/'));
   lastOutputFolder = dir;
 }
 
@@ -90,8 +198,9 @@ document.getElementById('audio-noise').addEventListener('change', function() {
 
 // ── RUN SINGLE PROCESS ───────────────────────────────────────
 async function runProcess(action) {
-  if (!fileInfo.path) return alert('Load video dulu!');
-  const input = fileInfo.path;
+  if (!pipelineState.lastOutput && !fileInfo.path) return alert('Load video dulu!');
+  // Bug Fix #3: gunakan lastOutput dari pipeline, bukan selalu input original
+  const input = pipelineState.lastOutput || fileInfo.path;
   let params = { input };
 
   if (action === 'crop') {
@@ -100,6 +209,8 @@ async function runProcess(action) {
   } else if (action === 'upscale') {
     if (fileInfo.height >= 1080) return alert('Resolusi sudah 1080p atau lebih, skip upscale.');
     params.output = document.getElementById('upscale-output').value;
+    params.algo = document.getElementById('upscale-algo').value;
+    params.crf = parseInt(document.getElementById('upscale-crf').value);
   } else if (action === 'loop') {
     params.output = document.getElementById('loop-output').value;
     params.duration = parseInt(document.getElementById('loop-duration').value);
@@ -114,6 +225,8 @@ async function runProcess(action) {
       params.custom_audio = document.getElementById('audio-custom-path').value;
     }
   } else if (action === 'thumbnail') {
+    // Thumbnail selalu dari file original agar ambil frame yang bersih
+    params.input = pipelineState.original || fileInfo.path;
     params.output = document.getElementById('thumb-output').value;
     params.text1 = document.getElementById('thumb-text1').value;
     params.text2 = document.getElementById('thumb-text2').value;
@@ -123,18 +236,18 @@ async function runProcess(action) {
   }
 
   if (!params.output) return alert('Isi output path dulu!');
-  lastOutputFolder = params.output.includes('\\') 
-    ? params.output.substring(0, params.output.lastIndexOf('\\'))
-    : params.output.substring(0, params.output.lastIndexOf('/'));
 
-  startStream('/api/process', { action, params });
+  const outputPath = params.output;
+  startStream('/api/process', { action, params }, () => {
+    setLastOutput(outputPath, action);
+  });
 }
 
 // ── RUN ALL IN ONE ───────────────────────────────────────────
 async function runProcessAll() {
   if (!fileInfo.path) return alert('Load video dulu!');
   const body = {
-    input: fileInfo.path,
+    input: pipelineState.original || fileInfo.path,
     output_dir: document.getElementById('all-output-dir').value,
     crop_px: parseInt(document.getElementById('all-crop-px').value),
     upscale: document.getElementById('all-upscale').checked,
@@ -150,7 +263,7 @@ async function runProcessAll() {
 }
 
 // ── SSE STREAM ───────────────────────────────────────────────
-function startStream(endpoint, body) {
+function startStream(endpoint, body, onDoneCallback) {
   clearLog();
   setProgress(0, '⏳ Memulai proses...');
   document.getElementById('btn-open-folder').classList.add('hidden');
@@ -174,7 +287,7 @@ function startStream(endpoint, body) {
           if (line.startsWith('data: ')) {
             try {
               const d = JSON.parse(line.slice(6));
-              handleStreamData(d);
+              handleStreamData(d, onDoneCallback);
             } catch(e) {}
           }
         });
@@ -185,7 +298,7 @@ function startStream(endpoint, body) {
   }).catch(err => setLog('❌ ' + err.message));
 }
 
-function handleStreamData(d) {
+function handleStreamData(d, onDoneCallback) {
   if (d.log) {
     appendLog(d.log);
     const match = d.log.match(/frame=\s*(\d+)/);
@@ -206,6 +319,7 @@ function handleStreamData(d) {
     document.getElementById('btn-open-folder').classList.remove('hidden');
     if (d.output) appendLog(`\n✅ Output: ${d.output}`);
     if (d.thumbnail) appendLog(`🖼️ Thumbnail: ${d.thumbnail}`);
+    if (onDoneCallback) onDoneCallback();
   }
   if (d.status === 'error') {
     setProgress(0, '❌ Error! Lihat log di bawah.');

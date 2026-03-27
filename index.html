@@ -8,7 +8,7 @@
 </head>
 <body>
   <header>
-    <h1>🎬 ASMR Video Tool <span class="version">v1.0</span></h1>
+    <h1>🎬 ASMR Video Tool <span class="version">v1.1</span></h1>
   </header>
 
   <main>
@@ -17,10 +17,17 @@
       <div id="drop-zone">
         <div class="drop-icon">🎥</div>
         <p>Drag & Drop Video Here</p>
-        <span>or</span>
-        <input type="text" id="file-path" placeholder="Paste full path: C:\videos\input.mp4" />
-        <button onclick="probeVideo()">📂 Load</button>
+        <span>atau</span>
+        <!-- Bug Fix #1: Browse button via tkinter -->
+        <button class="btn-browse" onclick="browseFile()">📂 Browse File...</button>
+        <div class="path-row">
+          <input type="text" id="file-path" placeholder="Atau ketik full path: C:\videos\input.mp4" />
+          <button onclick="probeVideo()" class="btn-load">Load</button>
+        </div>
       </div>
+
+      <!-- Bug Fix #3: Pipeline Indicator -->
+      <div id="pipeline-indicator" class="pipeline-indicator hidden"></div>
 
       <div id="file-info" class="hidden">
         <h3>📄 File Info</h3>
@@ -54,7 +61,10 @@
         <label><input type="checkbox" id="crop-pad" checked /> Tambah padding hitam (jaga resolusi)</label>
         <div class="output-row">
           <label>Output file</label>
-          <input type="text" id="crop-output" placeholder="C:\output\cropped.mp4" />
+          <div class="input-browse-row">
+            <input type="text" id="crop-output" placeholder="C:\output\cropped.mp4" />
+            <button onclick="browseOutputFolder('crop-output')">📂</button>
+          </div>
         </div>
         <button class="btn-process" onclick="runProcess('crop')">▶ Crop</button>
       </div>
@@ -73,7 +83,10 @@
         <input type="number" id="upscale-crf" value="18" min="1" max="30" />
         <div class="output-row">
           <label>Output file</label>
-          <input type="text" id="upscale-output" placeholder="C:\output\upscaled.mp4" />
+          <div class="input-browse-row">
+            <input type="text" id="upscale-output" placeholder="C:\output\upscaled.mp4" />
+            <button onclick="browseOutputFolder('upscale-output')">📂</button>
+          </div>
         </div>
         <button class="btn-process" onclick="runProcess('upscale')">▶ Upscale</button>
       </div>
@@ -97,7 +110,10 @@
         </select>
         <div class="output-row">
           <label>Output file</label>
-          <input type="text" id="loop-output" placeholder="C:\output\asmr_1jam.mp4" />
+          <div class="input-browse-row">
+            <input type="text" id="loop-output" placeholder="C:\output\asmr_1jam.mp4" />
+            <button onclick="browseOutputFolder('loop-output')">📂</button>
+          </div>
         </div>
         <button class="btn-process" onclick="runProcess('loop')">▶ Loop</button>
       </div>
@@ -114,11 +130,17 @@
         </select>
         <div id="audio-custom-row" class="hidden">
           <label>Path audio file (MP3/WAV)</label>
-          <input type="text" id="audio-custom-path" placeholder="C:\audio\rain.mp3" />
+          <div class="input-browse-row">
+            <input type="text" id="audio-custom-path" placeholder="C:\audio\rain.mp3" />
+            <button onclick="browseOutputFolder('audio-custom-path')">📂</button>
+          </div>
         </div>
         <div class="output-row">
           <label>Output file</label>
-          <input type="text" id="audio-output" placeholder="C:\output\with_audio.mp4" />
+          <div class="input-browse-row">
+            <input type="text" id="audio-output" placeholder="C:\output\with_audio.mp4" />
+            <button onclick="browseOutputFolder('audio-output')">📂</button>
+          </div>
         </div>
         <button class="btn-process" onclick="runProcess('audio')">▶ Inject Audio</button>
       </div>
@@ -138,7 +160,10 @@
         <input type="number" id="thumb-frame" value="1" min="0" />
         <div class="output-row">
           <label>Output file</label>
-          <input type="text" id="thumb-output" placeholder="C:\output\thumbnail.jpg" />
+          <div class="input-browse-row">
+            <input type="text" id="thumb-output" placeholder="C:\output\thumbnail.jpg" />
+            <button onclick="browseOutputFolder('thumb-output')">📂</button>
+          </div>
         </div>
         <button class="btn-process" onclick="runProcess('thumbnail')">▶ Extract Thumbnail</button>
       </div>
@@ -149,7 +174,10 @@
         <p class="note">Jalankan semua step otomatis: Crop → Upscale → Loop → Audio → Thumbnail</p>
         <div class="all-grid">
           <label>📁 Output Folder</label>
-          <input type="text" id="all-output-dir" placeholder="C:\output" />
+          <div class="input-browse-row">
+            <input type="text" id="all-output-dir" placeholder="C:\output" />
+            <button onclick="browseOutputFolder('all-output-dir')">📂</button>
+          </div>
 
           <label>✂️ Crop (px bawah)</label>
           <input type="number" id="all-crop-px" value="50" />
@@ -158,12 +186,14 @@
           <label><input type="checkbox" id="all-upscale" checked /> Aktifkan upscale</label>
 
           <label>🔁 Durasi Loop</label>
-          <div class="preset-btns">
-            <button onclick="document.getElementById('all-duration').value=3600">1 Jam</button>
-            <button onclick="document.getElementById('all-duration').value=10800">3 Jam</button>
-            <button onclick="document.getElementById('all-duration').value=28800">8 Jam</button>
+          <div>
+            <div class="preset-btns">
+              <button onclick="document.getElementById('all-duration').value=3600">1 Jam</button>
+              <button onclick="document.getElementById('all-duration').value=10800">3 Jam</button>
+              <button onclick="document.getElementById('all-duration').value=28800">8 Jam</button>
+            </div>
+            <input type="number" id="all-duration" value="3600" />
           </div>
-          <input type="number" id="all-duration" value="3600" />
 
           <label>🔊 Noise Ambient</label>
           <select id="all-noise">
