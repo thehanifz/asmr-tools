@@ -107,14 +107,8 @@ async def probe_video(request: Request):
 
 
 def escape_font_path(path: str) -> str:
-    """
-    FFmpeg drawtext fontfile di Windows: drive letter 'C:' harus di-escape jadi 'C\\:'
-    Backslash path juga perlu diganti forward slash.
-    """
-    # Ganti backslash ke forward slash
+    """Escape font path untuk FFmpeg filter di Windows."""
     path = path.replace("\\", "/")
-    # Escape colon pada drive letter: C:/ -> C\:/
-    # Hanya escape colon pertama (drive letter), bukan yang lain
     if len(path) >= 2 and path[1] == ":":
         path = path[0] + "\\:" + path[2:]
     return path
@@ -151,12 +145,10 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
         noise_color = params.get("noise", "brown")
         mode = params.get("mode", "hq")
 
-        # Hitung jumlah loop dan frame size secara akurat
         frame_size = round(video_duration * fps)
-        loops = max(1, int(duration // video_duration) + 1)  # +1 untuk buffer
+        loops = max(1, int(duration // video_duration) + 1)
 
         if mode == "fast":
-            # Fast: copy video stream, generate audio noise
             return [
                 "ffmpeg", "-y",
                 "-stream_loop", str(loops), "-i", input_path,
@@ -167,7 +159,6 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
                 output_path
             ]
         else:
-            # HQ: re-encode dengan loop filter
             return [
                 "ffmpeg", "-y", "-i", input_path,
                 "-filter_complex",
@@ -201,7 +192,7 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
 
     elif action == "thumbnail":
         frame_time = params.get("frame_time", 1)
-        # Escape special chars untuk FFmpeg filter
+
         def esc(s):
             return s.replace("\\", "/").replace("'", "\\'").replace(":", "\\:").replace(",", "\\,")
 
@@ -218,7 +209,6 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
             if text2:
                 vf += f",drawtext=text='{text2}':fontfile='{font}':fontsize={size2}:fontcolor=yellow:x=50:y={50+size1+10}:shadowcolor=black:shadowx=2:shadowy=2"
         else:
-            # Tanpa teks, extract frame saja
             vf = "scale=iw:ih"
 
         return [
@@ -231,15 +221,43 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
 
 
 async def run_ffmpeg_stream(cmd: list):
+    """
+    Baca stderr FFmpeg per CHUNK (bukan per line) untuk menghindari
+    LimitOverrunError saat FFmpeg output baris sangat panjang (>64KB).
+    Buffer dikumpulkan dan dipecah per newline secara manual.
+    """
+    # Buat subprocess dengan limit buffer besar (10MB)
+    limit = 10 * 1024 * 1024  # 10 MB
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        stderr=asyncio.subprocess.PIPE,
+        limit=limit
     )
-    async for line in process.stderr:
-        decoded = line.decode("utf-8", errors="ignore").strip()
+
+    leftover = b""
+    while True:
+        try:
+            chunk = await process.stderr.read(4096)
+        except Exception:
+            break
+        if not chunk:
+            break
+        data = leftover + chunk
+        lines = data.split(b"\n")
+        # Baris terakhir mungkin belum lengkap, simpan sebagai leftover
+        leftover = lines[-1]
+        for line in lines[:-1]:
+            decoded = line.decode("utf-8", errors="ignore").strip()
+            if decoded:
+                yield f"data: {json.dumps({'log': decoded})}\n\n"
+
+    # Flush sisa leftover
+    if leftover:
+        decoded = leftover.decode("utf-8", errors="ignore").strip()
         if decoded:
             yield f"data: {json.dumps({'log': decoded})}\n\n"
+
     await process.wait()
     rc = process.returncode
     if rc == 0:
