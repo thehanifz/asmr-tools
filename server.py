@@ -108,7 +108,6 @@ async def probe_video(request: Request):
 
 
 def fmt_duration(seconds: float) -> str:
-    """Format detik ke string h:mm:ss"""
     s = int(seconds)
     h = s // 3600
     m = (s % 3600) // 60
@@ -147,20 +146,24 @@ def build_ffmpeg_cmd(action: str, params: dict) -> list:
 
     if action == "crop":
         px = params.get("pixels", 50)
+        # FIX #1: pakai preset fast (bukan default slow) — crop cuma potong frame, tidak perlu slow
         return [
             "ffmpeg", "-y", "-i", input_path,
             "-vf", f"crop=in_w:in_h-{px}:0:0",
-            "-c:v", "libx264", "-crf", "23", "-c:a", "aac",
+            "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+            "-c:a", "copy",
             output_path
         ]
 
     elif action == "upscale":
         algo = params.get("algo", "lanczos")
-        crf = params.get("crf", 18)
+        # FIX #2: CRF default 23 (bukan 18), preset fast, maxrate 8Mbps agar file tidak meledak
+        crf = params.get("crf", 23)
         return [
             "ffmpeg", "-y", "-i", input_path,
             "-vf", f"scale=1920:1080:flags={algo}",
-            "-c:v", "libx264", "-crf", str(crf), "-preset", "slow",
+            "-c:v", "libx264", "-crf", str(crf), "-preset", "fast",
+            "-maxrate", "8000k", "-bufsize", "16000k",
             "-c:a", "copy",
             output_path
         ]
@@ -383,13 +386,14 @@ async def process_all(request: Request):
     do_upscale  = data.get("upscale", True)
     loop_mode   = data.get("loop_mode", "v2")
     crossfade   = float(data.get("crossfade", 0.3))
+    # FIX #3: ambil crf dari request, default 23
+    upscale_crf = int(data.get("upscale_crf", 23))
 
-    cropped = os.path.join(output_dir, f"{basename}_cropped.mp4")
+    cropped  = os.path.join(output_dir, f"{basename}_cropped.mp4")
     upscaled = os.path.join(output_dir, f"{basename}_1080p.mp4") if do_upscale else cropped
-    final   = os.path.join(output_dir, f"{basename}_final.mp4")
-    thumb   = os.path.join(output_dir, f"{basename}_thumbnail.jpg")
+    final    = os.path.join(output_dir, f"{basename}_final.mp4")
+    thumb    = os.path.join(output_dir, f"{basename}_thumbnail.jpg")
 
-    # ── Build step list dengan label deskriptif ──
     steps = []
     step_labels = []
     step_outputs = []
@@ -399,13 +403,16 @@ async def process_all(request: Request):
     step_labels.append(f"✂️  Crop watermark {crop_px}px dari bawah")
     step_outputs.append(cropped)
 
-    # Step: Upscale (optional)
+    # Step: Upscale (optional) — FIX: pakai crf dari param, preset fast, maxrate 8M
     if do_upscale:
-        steps.append(build_ffmpeg_cmd("upscale", {"input": cropped, "output": upscaled}))
-        step_labels.append("⬆️  Upscale ke 1080p (lanczos, crf 18)")
+        steps.append(build_ffmpeg_cmd("upscale", {
+            "input": cropped, "output": upscaled,
+            "crf": upscale_crf
+        }))
+        step_labels.append(f"⬆️  Upscale ke 1080p (lanczos, crf {upscale_crf}, maxrate 8Mbps)")
         step_outputs.append(upscaled)
 
-    # Step: Loop V2 (4 sub-steps) atau mode lain
+    # Step: Loop V2 atau mode lain
     if loop_mode == "v2":
         v2_steps, tmp_files = build_loop_v2_steps({
             "input": upscaled, "output": final,
@@ -451,9 +458,9 @@ async def process_all(request: Request):
         yield f"data: {json.dumps({'type': 'pipeline_start', 'total_steps': total_steps, 'input': os.path.basename(input_path), 'input_size': input_size, 'target': target_str, 'loop_mode': loop_mode})}\n\n"
 
         for i, cmd in enumerate(steps):
-            t_start   = time.time()
-            label     = step_labels[i]
-            out_file  = step_outputs[i]
+            t_start  = time.time()
+            label    = step_labels[i]
+            out_file = step_outputs[i]
 
             yield f"data: {json.dumps({'type': 'step_start', 'step': i+1, 'total': total_steps, 'label': label, 'cmd': ' '.join(cmd[:6])})}\n\n"
 
