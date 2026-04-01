@@ -372,6 +372,25 @@ async def loop_v2(request: Request):
     return StreamingResponse(run_v2(), media_type="text/event-stream")
 
 
+def safe_remove_file(path: str) -> None:
+    """Safely remove a file, compatible with Windows and Linux."""
+    if not path or not os.path.exists(path):
+        return
+    try:
+        # Windows sometimes locks files, so we try multiple times
+        for _ in range(3):
+            try:
+                os.remove(path)
+                break
+            except PermissionError:
+                # File might be locked by FFmpeg, wait and retry
+                time.sleep(0.5)
+            except Exception:
+                break
+    except Exception:
+        pass  # Ignore errors
+
+
 @app.post("/api/process-all")
 async def process_all(request: Request):
     data = await request.json()
@@ -397,6 +416,7 @@ async def process_all(request: Request):
     steps = []
     step_labels = []
     step_outputs = []
+    cleanup_after_step = {}  # step_index -> list of files to cleanup
 
     # Step: Crop
     steps.append(build_ffmpeg_cmd("crop", {"input": input_path, "output": cropped, "pixels": crop_px}))
@@ -411,6 +431,8 @@ async def process_all(request: Request):
         }))
         step_labels.append(f"⬆️  Upscale ke 1080p (lanczos, crf {upscale_crf}, maxrate 8Mbps)")
         step_outputs.append(upscaled)
+        # Mark cropped for cleanup after upscale completes
+        cleanup_after_step[1] = [cropped]
 
     # Step: Loop V2 atau mode lain
     if loop_mode == "v2":
@@ -430,6 +452,14 @@ async def process_all(request: Request):
         steps.extend(v2_steps)
         step_labels.extend(v2_labels)
         step_outputs.extend(v2_outputs)
+        
+        # Calculate step indices for V2 mode
+        v2_start_idx = 2 if do_upscale else 1
+        # After loop video copy (first V2 step), cleanup cropped/upscaled
+        cleanup_after_step[v2_start_idx] = [cropped, upscaled] if do_upscale else [cropped]
+        # After mux (last V2 step), cleanup V2 temp files
+        v2_end_idx = v2_start_idx + 3
+        cleanup_after_step[v2_end_idx] = [tmp_files["video_1h"], tmp_files["audio_wav"], tmp_files["audio_1h"]]
     else:
         steps.append(build_ffmpeg_cmd("loop", {
             "input": upscaled, "output": final,
@@ -438,6 +468,9 @@ async def process_all(request: Request):
         }))
         step_labels.append(f"🔁  Loop {loop_mode} → {fmt_duration(target_duration)}")
         step_outputs.append(final)
+        # After loop step, cleanup intermediate files
+        loop_step_idx = 2 if do_upscale else 1
+        cleanup_after_step[loop_step_idx] = [cropped, upscaled] if do_upscale else [cropped]
 
     # Step: Thumbnail
     steps.append(build_ffmpeg_cmd("thumbnail", {
@@ -481,6 +514,11 @@ async def process_all(request: Request):
                 return
 
             yield f"data: {json.dumps({'type': 'step_done', 'step': i+1, 'total': total_steps, 'label': label, 'elapsed': fmt_duration(elapsed), 'output_file': os.path.basename(out_file), 'output_size': size_str})}\n\n"
+
+            # Cleanup intermediate files after this step (Windows & Linux compatible)
+            if i in cleanup_after_step:
+                for f in cleanup_after_step[i]:
+                    safe_remove_file(f)
 
         total_elapsed = time.time() - total_start
         final_size    = get_file_size_str(final) if os.path.exists(final) else "?"
