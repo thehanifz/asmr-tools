@@ -5,6 +5,8 @@ Tool lokal untuk memproses video ASMR secara otomatis:
 
 Dibangun dengan FastAPI (backend) + vanilla JS ES Modules (frontend).
 
+> Last sync: 2026-04-06
+
 ---
 
 ## ✅ Fitur
