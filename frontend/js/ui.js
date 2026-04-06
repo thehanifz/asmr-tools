@@ -1,76 +1,85 @@
 /**
- * UI helpers — DOM utilities, toast, progress, log box.
- * No business logic here.
+ * UI helpers — per-panel toast, log, progress, status.
+ * All functions accept a panelId so each panel is independent.
  */
 
-/** Show a toast notification */
+// ── Toast ──────────────────────────────────────────────────────────
 export function toast(msg, type = "info") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
   const el = document.createElement("div");
   el.className = `toast toast-${type}`;
   el.textContent = msg;
-  document.body.appendChild(el);
+  container.appendChild(el);
   setTimeout(() => el.remove(), 3500);
 }
 
-/** Set progress bar (0-100) */
-export function setProgress(pct) {
-  const bar = document.getElementById("progress-bar");
-  if (bar) bar.style.width = `${pct}%`;
-}
-
-/** Append a line to the log box */
-export function log(msg, type = "") {
-  const box = document.getElementById("log-box");
+// ── Per-panel log ──────────────────────────────────────────────────
+export function log(panelId, msg, type = "") {
+  const box = document.getElementById(`${panelId}-log`);
   if (!box) return;
-  const line = document.createElement("div");
-  line.className = `log-line ${type}`;
-  line.textContent = msg;
+  box.style.display = "block";
+  const line = document.createElement("span");
+  line.className = `log-line${type ? ` log-${type}` : ""}`;
+  line.textContent = msg + "\n";
   box.appendChild(line);
   box.scrollTop = box.scrollHeight;
 }
 
-/** Clear log box */
-export function clearLog() {
-  const box = document.getElementById("log-box");
-  if (box) box.innerHTML = "";
+export function clearLog(panelId) {
+  const box = document.getElementById(`${panelId}-log`);
+  if (box) { box.innerHTML = ""; box.style.display = "none"; }
 }
 
-/** Set status text */
-export function setStatus(msg) {
-  const el = document.getElementById("progress-info");
+// ── Per-panel progress ─────────────────────────────────────────────
+export function setProgress(panelId, pct) {
+  const wrap = document.getElementById(`${panelId}-progress`);
+  const fill = document.getElementById(`${panelId}-progress-fill`);
+  if (!wrap || !fill) return;
+  wrap.style.display = "block";
+  fill.classList.remove("indeterminate");
+  fill.style.width = `${pct}%`;
+}
+
+export function setProgressIndeterminate(panelId) {
+  const wrap = document.getElementById(`${panelId}-progress`);
+  const fill = document.getElementById(`${panelId}-progress-fill`);
+  if (!wrap || !fill) return;
+  wrap.style.display = "block";
+  fill.classList.add("indeterminate");
+  fill.style.width = "40%";
+}
+
+export function hideProgress(panelId) {
+  const wrap = document.getElementById(`${panelId}-progress`);
+  if (wrap) wrap.style.display = "none";
+}
+
+// ── Panel status badge ────────────────────────────────────────────
+export function setPanelStatus(panelId, msg) {
+  const el = document.getElementById(`${panelId === "video" ? "video" : panelId === "audio" ? "audio" : "merge"}-status`);
   if (el) el.textContent = msg;
 }
 
-/** Toggle element visibility */
-export function show(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.remove("hidden");
-}
-export function hide(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.add("hidden");
-}
-
-/** Mark a panel as ready (green indicator) */
 export function setPanelReady(panelId, filename) {
-  const indicator = document.querySelector(`#${panelId} .panel-status`);
-  if (!indicator) return;
-  indicator.className = "panel-status ready";
-  indicator.textContent = `✅ ${filename}`;
+  setPanelStatus(panelId, `✅ ${filename}`);
 }
 
-/** Mark a panel as processing */
 export function setPanelProcessing(panelId) {
-  const indicator = document.querySelector(`#${panelId} .panel-status`);
-  if (!indicator) return;
-  indicator.className = "panel-status processing";
-  indicator.textContent = "⏳ Processing...";
+  setPanelStatus(panelId, "⏳ Processing...");
 }
 
-/** Mark a panel as idle */
 export function setPanelIdle(panelId) {
-  const indicator = document.querySelector(`#${panelId} .panel-status`);
-  if (!indicator) return;
-  indicator.className = "panel-status";
-  indicator.textContent = "";
+  setPanelStatus(panelId, "—");
+}
+
+// ── Probe card helpers ────────────────────────────────────────────
+export function showProbe(panelId) {
+  const el = document.getElementById(`${panelId}-probe`);
+  if (el) el.style.display = "flex";
+}
+
+export function hideProbe(panelId) {
+  const el = document.getElementById(`${panelId}-probe`);
+  if (el) el.style.display = "none";
 }

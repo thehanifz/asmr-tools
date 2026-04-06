@@ -1,100 +1,97 @@
 /**
- * Panel Audio — handles all logic for the Audio panel.
- * Responsibilities: file input, probe, loop/normalize/fade settings, process.
+ * Panel Audio — wired to HTML ids from index.html v2
  */
 import { state, emit } from "./state.js";
 import { probeFile, browseAudio, processAudio } from "./api.js";
-import { toast, log, clearLog, setStatus, setProgress, setPanelReady, setPanelProcessing, setPanelIdle } from "./ui.js";
+import { toast, log, clearLog, setProgress,
+         setPanelReady, setPanelProcessing, setPanelIdle, showProbe } from "./ui.js";
 
-const PANEL_ID = "panel-audio";
+const P = "audio";
 
 export function initAudioPanel() {
-  document.getElementById("btn-browse-audio")?.addEventListener("click", async () => {
+  document.getElementById("audio-browse")?.addEventListener("click", async () => {
     const res = await browseAudio();
-    if (res.path) loadAudioFile(res.path);
+    if (res?.path) await loadAudio(res.path);
   });
 
-  document.getElementById("btn-load-audio")?.addEventListener("click", () => {
-    const path = document.getElementById("audio-path")?.value.trim();
-    if (path) loadAudioFile(path);
-  });
+  document.getElementById("audio-run")?.addEventListener("click", runAudioProcess);
 
-  const dropZone = document.getElementById("audio-drop-zone");
-  dropZone?.addEventListener("dragover", (e) => e.preventDefault());
-  dropZone?.addEventListener("drop", (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) loadAudioFile(file.path ?? file.name);
+  document.getElementById("audio-path")?.addEventListener("change", (e) => {
+    if (e.target.value) loadAudio(e.target.value);
   });
-
-  document.getElementById("btn-process-audio")?.addEventListener("click", runAudioProcess);
 }
 
-async function loadAudioFile(path) {
+async function loadAudio(path) {
   state.audio.inputPath = path;
-  document.getElementById("audio-path").value = path;
-  setStatus("Probing audio...");
+  const el = document.getElementById("audio-path");
+  if (el) el.value = path;
+
+  setPanelProcessing(P);
   const info = await probeFile(path);
-  if (info.error) { toast(info.error, "error"); return; }
+  if (info.error) { toast(info.error, "error"); setPanelIdle(P); return; }
+
   state.audio.info = info;
-  renderAudioInfo(info);
-  setStatus("Audio loaded.");
+  renderAudioProbe(info);
+  showProbe(P);
+
+  // Auto-suggest output
+  const dir  = path.replace(/[\\/][^\\/]+$/, "");
+  const base = path.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
+  const outEl = document.getElementById("audio-output");
+  if (outEl && !outEl.value) outEl.value = `${dir}\\${base}_looped.flac`;
+
+  setPanelIdle(P);
 }
 
-function renderAudioInfo(info) {
-  const box = document.getElementById("audio-info");
-  if (!box) return;
-  box.classList.remove("hidden");
-  box.innerHTML = `
-    <table>
-      <tr><td>File</td><td>${info.filename}</td></tr>
-      <tr><td>Durasi</td><td>${info.duration_str}</td></tr>
-      <tr><td>Codec</td><td>${info.audio_codec ?? "-"}</td></tr>
-      <tr><td>Channels</td><td>${info.channels ?? "-"}</td></tr>
-      <tr><td>Sample Rate</td><td>${info.sample_rate ?? "-"} Hz</td></tr>
-      <tr><td>Ukuran</td><td>${info.size_str}</td></tr>
-    </table>
-  `;
+function renderAudioProbe(info) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? "—"; };
+  set("a-dur",     info.duration_str);
+  set("a-codec",   info.audio_codec);
+  set("a-sr",      info.sample_rate ? `${info.sample_rate} Hz` : "—");
+  set("a-ch",      info.channels);
+  set("a-bitrate", info.bitrate_str);
+  set("a-size",    info.size_str);
 }
 
 async function runAudioProcess() {
-  const { inputPath } = state.audio;
-  if (!inputPath) { toast("Pilih audio dulu!", "error"); return; }
-  const outputDir = state.output.folder || document.getElementById("output-folder")?.value.trim();
-  if (!outputDir) { toast("Set output folder dulu!", "error"); return; }
+  const inputPath = state.audio.inputPath || document.getElementById("audio-path")?.value.trim();
+  if (!inputPath) { toast("Pilih file audio dulu!", "error"); return; }
 
-  const duration = parseInt(document.getElementById("target-duration")?.value ?? 3600);
-  const volumeDb = parseFloat(document.getElementById("audio-volume")?.value ?? 0);
-  const fadeIn = parseFloat(document.getElementById("audio-fade-in")?.value ?? 2);
-  const fadeOut = parseFloat(document.getElementById("audio-fade-out")?.value ?? 3);
-  const normalize = document.getElementById("audio-normalize")?.checked ?? true;
+  const outputPath = document.getElementById("audio-output")?.value.trim();
+  if (!outputPath) { toast("Isi path output audio!", "error"); return; }
 
-  const basename = inputPath.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
-  const outputPath = `${outputDir}\\${basename}_audio_looped.m4a`;
+  const loopDur = parseInt(document.getElementById("audio-loop-dur")?.value ?? 3600);
+  const lufs    = parseFloat(document.getElementById("audio-lufs")?.value ?? "") || null;
+  const fadeIn  = parseFloat(document.getElementById("audio-fade-in")?.value ?? 3);
+  const fadeOut = parseFloat(document.getElementById("audio-fade-out")?.value ?? 5);
 
-  setPanelProcessing(PANEL_ID);
-  clearLog();
-  setProgress(0);
-  setStatus("Processing audio...");
+  const payload = {
+    input:    inputPath,
+    output:   outputPath,
+    duration: loopDur,
+    lufs:     lufs,
+    fade_in:  fadeIn,
+    fade_out: fadeOut,
+  };
 
-  await processAudio(
-    { input: inputPath, output: outputPath, duration, volume_db: volumeDb, fade_in: fadeIn, fade_out: fadeOut, normalize },
-    (event) => {
-      if (event.log) {
-        log(event.log);
-      } else if (event.status === "done") {
-        state.audio.outputPath = outputPath;
-        state.audio.ready = true;
-        setProgress(100);
-        setStatus("✅ Audio selesai!");
-        setPanelReady(PANEL_ID, outputPath.split(/[\\/]/).pop());
-        toast("Audio selesai diproses!", "success");
-        emit("audio:ready", { path: outputPath });
-      } else if (event.status === "error") {
-        setPanelIdle(PANEL_ID);
-        setStatus("❌ Error saat proses audio");
-        toast("Proses audio gagal.", "error");
-      }
+  setPanelProcessing(P);
+  clearLog(P);
+  setProgress(P, 0);
+
+  await processAudio(payload, (ev) => {
+    if (ev.log) {
+      log(P, ev.log);
+    } else if (ev.status === "done") {
+      state.audio.outputPath = outputPath;
+      state.audio.ready = true;
+      setProgress(P, 100);
+      setPanelReady(P, outputPath.split(/[\\/]/).pop());
+      toast("Audio selesai!", "success");
+      emit("audio:ready", { path: outputPath });
+    } else if (ev.status === "error") {
+      setPanelIdle(P);
+      log(P, `❌ ${ev.message ?? "Error"}`, "error");
+      toast("Proses audio gagal.", "error");
     }
-  );
+  });
 }

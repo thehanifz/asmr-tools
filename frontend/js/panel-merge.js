@@ -1,124 +1,119 @@
 /**
- * Panel Merge — handles merge + thumbnail + final export.
- * Activates automatically when both video:ready and audio:ready events fire.
+ * Panel Merge & Export — wired to HTML ids from index.html v2
  */
 import { state } from "./state.js";
-import { mergeFiles, makeThumbnail, openFolder, browseFolder } from "./api.js";
-import { toast, log, clearLog, setStatus, setProgress, show, hide } from "./ui.js";
+import { probeFile, browseVideo, browseAudio, mergeFiles, makeThumbnail } from "./api.js";
+import { toast, log, clearLog, setProgress, setProgressIndeterminate,
+         setPanelReady, setPanelProcessing, setPanelIdle } from "./ui.js";
+
+const P = "merge";
 
 export function initMergePanel() {
-  // Listen for panel-ready events
-  document.addEventListener("video:ready", updateMergeReadiness);
-  document.addEventListener("audio:ready", updateMergeReadiness);
+  // Auto-fill from video/audio ready events
+  document.addEventListener("video:ready", (e) => {
+    const el = document.getElementById("merge-video");
+    if (el && e.detail?.path) el.value = e.detail.path;
+  });
+  document.addEventListener("audio:ready", (e) => {
+    const el = document.getElementById("merge-audio");
+    if (el && e.detail?.path) el.value = e.detail.path;
+  });
 
-  // Output folder browse
-  document.getElementById("btn-browse-folder")?.addEventListener("click", async () => {
-    const res = await browseFolder();
-    if (res.path) {
-      state.output.folder = res.path;
-      document.getElementById("output-folder").value = res.path;
+  // Browse buttons (manual)
+  document.getElementById("merge-video-browse")?.addEventListener("click", async () => {
+    const res = await browseVideo();
+    if (res?.path) document.getElementById("merge-video").value = res.path;
+  });
+  document.getElementById("merge-audio-browse")?.addEventListener("click", async () => {
+    const res = await browseAudio();
+    if (res?.path) document.getElementById("merge-audio").value = res.path;
+  });
+
+  // Auto-suggest merge output
+  document.getElementById("merge-video")?.addEventListener("change", (e) => {
+    const path = e.target.value;
+    if (!path) return;
+    const dir  = path.replace(/[\\/][^\\/]+$/, "");
+    const base = path.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
+    const outEl = document.getElementById("merge-output");
+    if (outEl && !outEl.value) outEl.value = `${dir}\\${base}_final.mp4`;
+  });
+
+  // Merge run
+  document.getElementById("merge-run")?.addEventListener("click", runMerge);
+
+  // Thumbnail browse + run
+  document.getElementById("thumb-video-browse")?.addEventListener("click", async () => {
+    const res = await browseVideo();
+    if (res?.path) {
+      const el = document.getElementById("thumb-video");
+      if (el) el.value = res.path;
+      // Auto-suggest thumb output
+      const dir  = res.path.replace(/[\\/][^\\/]+$/, "");
+      const base = res.path.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
+      const outEl = document.getElementById("thumb-output");
+      if (outEl && !outEl.value) outEl.value = `${dir}\\${base}_thumbnail.jpg`;
     }
   });
 
-  // Duration presets
-  document.querySelectorAll("[data-duration]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const val = parseInt(btn.dataset.duration);
-      state.output.targetDuration = val;
-      const input = document.getElementById("target-duration");
-      if (input) input.value = val;
-    });
-  });
-
-  // Merge button
-  document.getElementById("btn-merge")?.addEventListener("click", runMerge);
-
-  // Open folder button
-  document.getElementById("btn-open-folder")?.addEventListener("click", () => {
-    openFolder(state.output.folder);
-  });
-}
-
-function updateMergeReadiness() {
-  const btn = document.getElementById("btn-merge");
-  if (!btn) return;
-  const videoReady = state.video.ready;
-  const audioReady = state.audio.ready;
-
-  // Update source display in merge panel
-  const videoLabel = document.getElementById("merge-video-label");
-  const audioLabel = document.getElementById("merge-audio-label");
-  if (videoLabel) videoLabel.textContent = videoReady
-    ? `✅ ${state.video.outputPath?.split(/[\\/]/).pop()}`
-    : "⏳ Belum diproses";
-  if (audioLabel) audioLabel.textContent = audioReady
-    ? `✅ ${state.audio.outputPath?.split(/[\\/]/).pop()}`
-    : "⏳ Belum diproses";
-
-  btn.disabled = !(videoReady && audioReady);
-  btn.classList.toggle("btn-ready", videoReady && audioReady);
+  document.getElementById("thumb-run")?.addEventListener("click", runThumbnail);
 }
 
 async function runMerge() {
-  const { video, audio, output } = state;
-  if (!video.outputPath || !audio.outputPath) {
-    toast("Video dan Audio harus diproses dulu!", "error");
+  const videoPath  = document.getElementById("merge-video")?.value.trim();
+  const audioPath  = document.getElementById("merge-audio")?.value.trim();
+  const outputPath = document.getElementById("merge-output")?.value.trim();
+
+  if (!videoPath)  { toast("Pilih file video!", "error"); return; }
+  if (!audioPath)  { toast("Pilih file audio!", "error"); return; }
+  if (!outputPath) { toast("Isi path output!", "error"); return; }
+
+  setPanelProcessing(P);
+  clearLog(P);
+  setProgress(P, 0);
+
+  await mergeFiles({ video: videoPath, audio: audioPath, output: outputPath }, (ev) => {
+    if (ev.log) {
+      log(P, ev.log);
+    } else if (ev.type === "done" || ev.status === "done") {
+      setProgress(P, 100);
+      log(P, `✅ Merge selesai — ${ev.size ?? ""} ${ev.elapsed ?? ""}`, "done");
+      setPanelReady(P, outputPath.split(/[\\/]/).pop());
+      toast("Merge selesai!", "success");
+    } else if (ev.status === "error") {
+      setPanelIdle(P);
+      log(P, `❌ ${ev.message ?? "Merge error"}`, "error");
+      toast("Merge gagal.", "error");
+    }
+  });
+}
+
+async function runThumbnail() {
+  const videoPath  = document.getElementById("thumb-video")?.value.trim();
+  const outputPath = document.getElementById("thumb-output")?.value.trim();
+  const time       = parseFloat(document.getElementById("thumb-time")?.value ?? 5);
+
+  if (!videoPath)  { toast("Pilih video untuk thumbnail!", "error"); return; }
+  if (!outputPath) { toast("Isi path output thumbnail!", "error"); return; }
+
+  log(P, "Generating thumbnail...");
+  const res = await makeThumbnail({ input: videoPath, output: outputPath, time_sec: time });
+
+  if (res.error) {
+    log(P, `❌ ${res.error}`, "error");
+    toast("Thumbnail gagal.", "error");
     return;
   }
 
-  const folder = output.folder || document.getElementById("output-folder")?.value.trim();
-  const thumbText1 = document.getElementById("thumb-text1")?.value.trim() ?? "";
-  const thumbText2 = document.getElementById("thumb-text2")?.value.trim() ?? "";
+  log(P, `🖼️ Thumbnail saved: ${outputPath}`, "done");
+  toast("Thumbnail berhasil!", "success");
 
-  // Build output filename from video base
-  const base = video.outputPath.split(/[\\/]/).pop().replace(/_video_looped\.mp4$/, "");
-  const finalOutput = `${folder}\\${base}_final.mp4`;
-  const thumbOutput = `${folder}\\${base}_thumbnail.jpg`;
-
-  clearLog();
-  setProgress(0);
-  setStatus("Merging video + audio...");
-  hide("btn-open-folder");
-
-  // Step 1: Merge
-  await mergeFiles(
-    { video: video.outputPath, audio: audio.outputPath, output: finalOutput },
-    (event) => {
-      if (event.log) log(event.log);
-      else if (event.type === "done") {
-        setProgress(50);
-        log(`✅ Merge selesai — ${event.size} (${event.elapsed})`, "success");
-        setStatus("Generating thumbnail...");
-      } else if (event.status === "error") {
-        toast("Merge gagal.", "error");
-        setStatus("❌ Merge error");
-      }
-    }
-  );
-
-  // Step 2: Thumbnail (from original video input)
-  if (video.inputPath) {
-    await makeThumbnail(
-      {
-        input: video.inputPath,
-        output: thumbOutput,
-        text1: thumbText1,
-        text2: thumbText2,
-      },
-      (event) => {
-        if (event.log) log(event.log);
-        else if (event.status === "done") {
-          setProgress(100);
-          log(`🖼️ Thumbnail saved: ${thumbOutput}`, "success");
-          setStatus("✅ Semua selesai!");
-          toast("🎉 Export selesai!", "success");
-          show("btn-open-folder");
-        }
-      }
-    );
-  } else {
-    setProgress(100);
-    setStatus("✅ Merge selesai!");
-    show("btn-open-folder");
+  // Show preview via blob URL from server static
+  const preview = document.getElementById("thumb-preview");
+  const wrap    = document.getElementById("thumb-preview-wrap");
+  if (preview && wrap) {
+    // request image from /api/thumbnail/preview?path=...
+    preview.src = `/api/thumbnail/preview?path=${encodeURIComponent(outputPath)}&t=${Date.now()}`;
+    wrap.style.display = "block";
   }
 }

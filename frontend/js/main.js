@@ -1,6 +1,5 @@
 /**
- * main.js — App entry point.
- * Imports and initialises all panels.
+ * Entry point — initialise all panels.
  */
 import { initVideoPanel } from "./panel-video.js";
 import { initAudioPanel } from "./panel-audio.js";
@@ -11,21 +10,19 @@ document.addEventListener("DOMContentLoaded", () => {
   initAudioPanel();
   initMergePanel();
 
-  // Output folder input sync → state
-  const folderInput = document.getElementById("output-folder");
-  folderInput?.addEventListener("change", () => {
-    const { state } = window._state ?? {}; // fallback if needed
-  });
-
-  // Target duration input sync
-  const durationInput = document.getElementById("target-duration");
-  durationInput?.addEventListener("input", () => {
-    const secs = parseInt(durationInput.value);
-    const label = document.getElementById("duration-label");
-    if (label && secs) {
-      const h = Math.floor(secs / 3600);
-      const m = Math.floor((secs % 3600) / 60);
-      label.textContent = h > 0 ? `= ${h} jam ${m} menit` : `= ${m} menit`;
-    }
-  });
+  // FFmpeg badge check
+  fetch("/api/probe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "" }),
+  })
+    .then(() => {
+      const badge = document.getElementById("ffmpeg-status");
+      if (badge) { badge.textContent = "FFmpeg ✓"; badge.style.color = "var(--success)"; }
+    })
+    .catch(() => {
+      const badge = document.getElementById("ffmpeg-status");
+      if (badge) { badge.textContent = "FFmpeg ✗"; badge.style.color = "var(--error)";
+                   badge.style.background = "var(--error-dim)"; }
+    });
 });
