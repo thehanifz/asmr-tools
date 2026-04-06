@@ -1,66 +1,88 @@
-"""Audio processing: loop, normalize, fade."""
+"""Audio processing: loop, normalize (LUFS), fade."""
 import os
 import json
 import time
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str, safe_remove_file
+from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 
 
-# ── FFmpeg command builders ──────────────────────────────────────
+# ── FFmpeg command builder ─────────────────────────────────────────────────
 
 def cmd_audio_loop(
     input_path: str,
     output_path: str,
     duration: int = 3600,
-    volume_db: float = 0.0,
-    fade_in: float = 2.0,
-    fade_out: float = 3.0,
-    normalize: bool = True,
+    lufs: float | None = None,
+    fade_in: float = 3.0,
+    fade_out: float = 5.0,
 ) -> list:
     """
-    Loop audio to target duration with:
-    - volume adjustment
-    - optional loudnorm (-14 LUFS YouTube standard)
-    - fade in / fade out
+    Loop + optional loudnorm + fade in/out.
+
+    lufs  : target integrated loudness (e.g. -14). None = skip normalize.
     """
-    fade_out_start = duration - fade_out
+    fade_out_start = max(0, duration - fade_out)
     filters = []
 
-    if normalize:
-        filters.append("loudnorm=I=-14:TP=-1.5:LRA=11")
-    if volume_db != 0:
-        filters.append(f"volume={volume_db}dB")
+    # Optional loudnorm
+    if lufs is not None:
+        filters.append(f"loudnorm=I={lufs}:TP=-1.5:LRA=11")
+
+    # Trim to exact duration + reset timestamps
     filters.append(f"atrim=duration={duration},asetpts=PTS-STARTPTS")
-    filters.append(f"afade=t=in:st=0:d={fade_in}")
-    filters.append(f"afade=t=out:st={fade_out_start}:d={fade_out}")
+
+    # Fades
+    if fade_in > 0:
+        filters.append(f"afade=t=in:st=0:d={fade_in}")
+    if fade_out > 0:
+        filters.append(f"afade=t=out:st={fade_out_start}:d={fade_out}")
 
     filter_str = ",".join(filters)
+
+    # Choose output codec from extension
+    ext = os.path.splitext(output_path)[1].lower()
+    codec_args = {
+        ".flac": ["-c:a", "flac"],
+        ".wav":  ["-c:a", "pcm_s24le"],
+        ".m4a":  ["-c:a", "aac", "-b:a", "192k"],
+        ".mp3":  ["-c:a", "libmp3lame", "-b:a", "192k"],
+    }.get(ext, ["-c:a", "aac", "-b:a", "192k"])
+
     return [
         "ffmpeg", "-y",
         "-stream_loop", "-1", "-i", input_path,
-        "-filter_complex", filter_str,
-        "-c:a", "aac", "-b:a", "192k",
+        "-af", filter_str,
+        *codec_args,
         "-t", str(duration),
         output_path,
     ]
 
 
-# ── Endpoints ────────────────────────────────────────────────────
+# ── Endpoint ─────────────────────────────────────────────────────────────
 
 @router.post("/loop")
 async def loop_audio(request: Request):
-    """Loop + normalize + fade audio file to target duration."""
-    data = await request.json()
-    input_path = data["input"]
-    output_path = data["output"]
-    duration = int(data.get("duration", 3600))
-    volume_db = float(data.get("volume_db", 0.0))
-    fade_in = float(data.get("fade_in", 2.0))
-    fade_out = float(data.get("fade_out", 3.0))
-    normalize = bool(data.get("normalize", True))
+    """Loop + normalize + fade audio to target duration.
 
-    cmd = cmd_audio_loop(input_path, output_path, duration, volume_db, fade_in, fade_out, normalize)
+    Payload fields:
+      input    : str          — source audio path
+      output   : str          — output path (.flac / .m4a / .mp3 / .wav)
+      duration : int          — target duration in seconds (default 3600)
+      lufs     : float|null   — target LUFS e.g. -14, or null to skip normalize
+      fade_in  : float        — fade-in duration seconds (default 3)
+      fade_out : float        — fade-out duration seconds (default 5)
+    """
+    data = await request.json()
+    input_path  = data["input"]
+    output_path = data["output"]
+    duration    = int(data.get("duration", 3600))
+    lufs_raw    = data.get("lufs")                          # None or float
+    lufs        = float(lufs_raw) if lufs_raw is not None else None
+    fade_in     = float(data.get("fade_in",  3.0))
+    fade_out    = float(data.get("fade_out", 5.0))
+
+    cmd = cmd_audio_loop(input_path, output_path, duration, lufs, fade_in, fade_out)
     return StreamingResponse(run_ffmpeg_stream(cmd), media_type="text/event-stream")

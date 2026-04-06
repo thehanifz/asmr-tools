@@ -15,8 +15,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# API routes first
 app.include_router(router, prefix="/api")
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
+# Serve frontend JS/CSS as /js/... and /style.css
+# Mount at root level so index.html relative paths work
+app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
+app.mount("/assets", StaticFiles(directory="frontend/assets"), name="assets")
+
+
+@app.get("/style.css")
+async def serve_css():
+    from fastapi.responses import FileResponse
+    return FileResponse("frontend/style.css", media_type="text/css")
 
 
 @app.get("/", response_class=HTMLResponse)
