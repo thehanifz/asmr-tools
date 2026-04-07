@@ -29,12 +29,16 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="16" height="16" rx="2"/><polygon points="22,4 22,20 16,12"/></svg>
         <span>Video</span>
       </button>
+      <button class="nav-item" data-tool="extract">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <span>Extract</span>
+      </button>
       <button class="nav-item" data-tool="audio">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         <span>Audio</span>
       </button>
       <button class="nav-item" data-tool="denoise">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         <span>Denoise</span>
       </button>
       <button class="nav-item" data-tool="merge">
@@ -125,6 +129,54 @@
           <div class="progress-label" id="videoProgressLabel"></div>
         </div>
         <div class="log-box" id="videoLog"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════ EXTRACT AUDIO ═══ -->
+    <section class="tool-panel hidden" id="tool-extract">
+      <div class="tool-header">
+        <h1 class="tool-title">Extract Audio</h1>
+        <span class="tool-badge">Video → MP3 / WAV / AAC / FLAC / OGG</span>
+      </div>
+
+      <div class="tool-body">
+        <div class="field-group">
+          <label class="field-label">File Video</label>
+          <div class="file-row">
+            <input type="text" id="extractInput" class="file-input" placeholder="Pilih file video..." readonly>
+            <button class="btn btn-secondary" id="extractBrowse">Browse</button>
+          </div>
+          <div class="file-info" id="extractInfo"></div>
+        </div>
+
+        <div class="controls-grid">
+          <div class="field-group">
+            <label class="field-label">Format Output</label>
+            <select id="extractFormat" class="input">
+              <option value="mp3">MP3 — Kompatibel, kecil</option>
+              <option value="aac">AAC — YouTube ready</option>
+              <option value="wav">WAV — Lossless, besar</option>
+              <option value="flac">FLAC — Lossless, terkompresi</option>
+              <option value="ogg">OGG — Open source</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <div class="file-row">
+            <input type="text" id="extractOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
+            <button class="btn btn-secondary" id="extractOutputBrowse">📁</button>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="extractProcess">▶ Extract Audio</button>
+
+        <div class="progress-wrap" id="extractProgressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="extractProgressFill"></div></div>
+          <div class="progress-label" id="extractProgressLabel"></div>
+        </div>
+        <div class="log-box" id="extractLog"></div>
       </div>
     </section>
 

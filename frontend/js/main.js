@@ -6,8 +6,9 @@ import { initAudio }     from './panel-audio.js';
 import { initDenoise }   from './panel-denoise.js';
 import { initMerge }     from './panel-merge.js';
 import { initThumbnail } from './panel-thumbnail.js';
+import { initExtract }   from './panel-extract.js';
 
-const TOOLS = ['video', 'audio', 'denoise', 'merge', 'thumbnail'];
+const TOOLS = ['video', 'extract', 'audio', 'denoise', 'merge', 'thumbnail'];
 
 function activateTool(name) {
   TOOLS.forEach(t => {
@@ -22,6 +23,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 
 // Init all panels
 initVideo();
+initExtract();
 initAudio();
 initDenoise();
 initMerge();
