@@ -20,13 +20,17 @@
         <circle cx="21" cy="14" r="1.5" fill="white"/>
       </svg>
       <span class="logo-text">ASMR Tools</span>
-      <span class="version-badge">v1.3</span>
+      <span class="version-badge">v1.4</span>
     </div>
 
     <nav class="sidebar-nav">
       <button class="nav-item active" data-tab="video" onclick="switchTab('video')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polygon points="10 9 15 12 10 15"/></svg>
         Video Pipeline
+      </button>
+      <button class="nav-item" data-tab="extract-audio" onclick="switchTab('extract-audio')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        Extract Audio
       </button>
       <button class="nav-item" data-tab="audio" onclick="switchTab('audio')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -37,7 +41,7 @@
         Denoise
       </button>
       <button class="nav-item" data-tab="merge" onclick="switchTab('merge')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8z"/><polyline points="16 3 22 3 22 9"/><line x1="10" y1="14" x2="22" y2="2"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
         Merge Audio
       </button>
       <button class="nav-item" data-tab="thumbnail" onclick="switchTab('thumbnail')">
@@ -66,7 +70,6 @@
 
   <!-- MAIN CONTENT -->
   <div class="main-wrapper">
-    <!-- TOP BAR -->
     <header class="topbar">
       <div class="topbar-title" id="topbar-title">Video Pipeline</div>
       <div class="topbar-actions">
@@ -75,7 +78,7 @@
     </header>
 
     <div class="content-area">
-      <!-- FILE DROP ZONE (always visible) -->
+      <!-- DROP ZONE -->
       <div class="dropzone-card" id="drop-zone">
         <div class="dropzone-inner">
           <div class="drop-icon">
@@ -108,37 +111,17 @@
         <!-- VIDEO PIPELINE -->
         <div id="tab-video" class="tab-panel active">
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Crop</span>
-              <span class="card-desc">Potong area video</span>
-            </div>
+            <div class="card-header"><span class="card-title">Crop</span><span class="card-desc">Potong area video</span></div>
             <div class="form-grid">
-              <div class="field">
-                <label class="field-label">Crop Atas (px)</label>
-                <input type="number" id="crop-top" value="0" min="0" />
-              </div>
-              <div class="field">
-                <label class="field-label">Crop Bawah (px)</label>
-                <input type="number" id="crop-bottom" value="0" min="0" />
-              </div>
-              <div class="field">
-                <label class="field-label">Crop Kiri (px)</label>
-                <input type="number" id="crop-left" value="0" min="0" />
-              </div>
-              <div class="field">
-                <label class="field-label">Crop Kanan (px)</label>
-                <input type="number" id="crop-right" value="0" min="0" />
-              </div>
+              <div class="field"><label class="field-label">Crop Atas (px)</label><input type="number" id="crop-top" value="0" min="0" /></div>
+              <div class="field"><label class="field-label">Crop Bawah (px)</label><input type="number" id="crop-bottom" value="0" min="0" /></div>
+              <div class="field"><label class="field-label">Crop Kiri (px)</label><input type="number" id="crop-left" value="0" min="0" /></div>
+              <div class="field"><label class="field-label">Crop Kanan (px)</label><input type="number" id="crop-right" value="0" min="0" /></div>
             </div>
           </div>
-
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Upscale</span>
-              <span class="card-desc">Tingkatkan resolusi ke 1080p</span>
-            </div>
-            <div class="field">
-              <label class="field-label">Algoritma</label>
+            <div class="card-header"><span class="card-title">Upscale</span><span class="card-desc">Tingkatkan resolusi ke 1080p</span></div>
+            <div class="field"><label class="field-label">Algoritma</label>
               <select id="upscale-algo">
                 <option value="skip">— Skip —</option>
                 <option value="lanczos">Lanczos (Recommended)</option>
@@ -147,12 +130,8 @@
               </select>
             </div>
           </div>
-
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Loop</span>
-              <span class="card-desc">Ulangi video hingga durasi target</span>
-            </div>
+            <div class="card-header"><span class="card-title">Loop</span><span class="card-desc">Ulangi video hingga durasi target</span></div>
             <div class="preset-group">
               <button class="preset-btn" onclick="setDuration(3600)">1 Jam</button>
               <button class="preset-btn" onclick="setDuration(10800)">3 Jam</button>
@@ -160,82 +139,113 @@
               <button class="preset-btn" onclick="setDuration(36000)">10 Jam</button>
             </div>
             <div class="form-grid">
-              <div class="field">
-                <label class="field-label">Durasi Loop (detik)</label>
-                <input type="number" id="loop-duration" value="3600" min="60" />
-                <span class="field-hint" id="duration-label">= 1 jam 0 menit</span>
-              </div>
-              <div class="field">
-                <label class="field-label">Crossfade Audio (detik)</label>
-                <input type="number" id="loop-crossfade" value="0.3" step="0.1" min="0.1" max="2" />
-              </div>
+              <div class="field"><label class="field-label">Durasi Loop (detik)</label><input type="number" id="loop-duration" value="3600" min="60" /><span class="field-hint" id="duration-label">= 1 jam 0 menit</span></div>
+              <div class="field"><label class="field-label">Crossfade Audio (detik)</label><input type="number" id="loop-crossfade" value="0.3" step="0.1" min="0.1" max="2" /></div>
             </div>
-            <div class="field">
-              <label class="checkbox-label">
-                <input type="checkbox" id="keep-audio" checked />
-                <span>Pertahankan suara original video</span>
-              </label>
-            </div>
+            <div class="field"><label class="checkbox-label"><input type="checkbox" id="keep-audio" checked /><span>Pertahankan suara original video</span></label></div>
           </div>
-
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Output</span>
-            </div>
-            <div class="field">
-              <label class="field-label">Output File</label>
+            <div class="card-header"><span class="card-title">Output</span></div>
+            <div class="field"><label class="field-label">Output File</label>
               <div class="input-group">
                 <input type="text" id="video-output" placeholder="Otomatis dari workspace..." />
-                <button class="btn-icon" onclick="browseOutputFolder('video-output')" title="Browse">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
+                <button class="btn-icon" onclick="browseOutputFolder('video-output')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
               </div>
             </div>
             <button class="btn-process" onclick="runProcess('video')">Proses Video</button>
           </div>
         </div>
 
+        <!-- EXTRACT AUDIO -->
+        <div id="tab-extract-audio" class="tab-panel">
+          <div class="form-card">
+            <div class="card-header">
+              <span class="card-title">Extract Audio</span>
+              <span class="card-desc">Ambil audio dari file video</span>
+            </div>
+
+            <div class="field">
+              <label class="field-label">File Video</label>
+              <div class="input-group">
+                <input type="text" id="extract-input" placeholder="Otomatis dari file yang di-load..." />
+                <button class="btn-icon" onclick="browseOutputFolder('extract-input')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+              </div>
+              <span class="field-hint">Kosongkan untuk pakai file yang sudah di-load</span>
+            </div>
+
+            <div class="field">
+              <label class="field-label">Format Output</label>
+              <div class="format-grid">
+                <label class="format-option">
+                  <input type="radio" name="extract-fmt" value="mp3" checked />
+                  <span class="format-label">
+                    <span class="format-name">MP3</span>
+                    <span class="format-desc">Kompatibel luas, ~192 kbps</span>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="extract-fmt" value="wav" />
+                  <span class="format-label">
+                    <span class="format-name">WAV</span>
+                    <span class="format-desc">Lossless, ukuran besar</span>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="extract-fmt" value="aac" />
+                  <span class="format-label">
+                    <span class="format-name">AAC</span>
+                    <span class="format-desc">Kualitas tinggi, ~192 kbps</span>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="extract-fmt" value="flac" />
+                  <span class="format-label">
+                    <span class="format-name">FLAC</span>
+                    <span class="format-desc">Lossless terkompresi</span>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="extract-fmt" value="ogg" />
+                  <span class="format-label">
+                    <span class="format-name">OGG</span>
+                    <span class="format-desc">Open source, ~160 kbps</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">Output File</label>
+              <div class="input-group">
+                <input type="text" id="extract-output" placeholder="Otomatis dari workspace..." />
+                <button class="btn-icon" onclick="browseOutputFolder('extract-output')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+              </div>
+            </div>
+
+            <button class="btn-process" onclick="runExtractAudio()">Extract Audio</button>
+          </div>
+        </div>
+
         <!-- AUDIO LOOP -->
         <div id="tab-audio" class="tab-panel">
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Audio Loop</span>
-              <span class="card-desc">Loop + Normalize + Fade</span>
-            </div>
-            <div class="field">
-              <label class="field-label">File Audio</label>
+            <div class="card-header"><span class="card-title">Audio Loop</span><span class="card-desc">Loop + Normalize + Fade</span></div>
+            <div class="field"><label class="field-label">File Audio</label>
               <div class="input-group">
                 <input type="text" id="audio-file" placeholder="Pilih file audio..." />
-                <button class="btn-icon" onclick="browseOutputFolder('audio-file')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
+                <button class="btn-icon" onclick="browseOutputFolder('audio-file')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
               </div>
             </div>
             <div class="form-grid">
-              <div class="field">
-                <label class="field-label">Durasi (detik)</label>
-                <input type="number" id="audio-loop-duration" value="3600" />
-              </div>
-              <div class="field">
-                <label class="field-label">Target LUFS</label>
-                <input type="number" id="audio-lufs" value="-14" min="-30" max="0" />
-              </div>
-              <div class="field">
-                <label class="field-label">Fade In (detik)</label>
-                <input type="number" id="audio-fade-in" value="3" min="0" />
-              </div>
-              <div class="field">
-                <label class="field-label">Fade Out (detik)</label>
-                <input type="number" id="audio-fade-out" value="5" min="0" />
-              </div>
+              <div class="field"><label class="field-label">Durasi (detik)</label><input type="number" id="audio-loop-duration" value="3600" /></div>
+              <div class="field"><label class="field-label">Target LUFS</label><input type="number" id="audio-lufs" value="-14" min="-30" max="0" /></div>
+              <div class="field"><label class="field-label">Fade In (detik)</label><input type="number" id="audio-fade-in" value="3" min="0" /></div>
+              <div class="field"><label class="field-label">Fade Out (detik)</label><input type="number" id="audio-fade-out" value="5" min="0" /></div>
             </div>
-            <div class="field">
-              <label class="field-label">Output</label>
+            <div class="field"><label class="field-label">Output</label>
               <div class="input-group">
                 <input type="text" id="audio-output" placeholder="Otomatis dari workspace..." />
-                <button class="btn-icon" onclick="browseOutputFolder('audio-output')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
+                <button class="btn-icon" onclick="browseOutputFolder('audio-output')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
               </div>
             </div>
             <button class="btn-process" onclick="runProcess('audio-loop')">Proses Audio</button>
@@ -245,36 +255,21 @@
         <!-- DENOISE -->
         <div id="tab-denoise" class="tab-panel">
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Denoise Audio</span>
-              <span class="card-desc">noisereduce · Python 3.12</span>
-            </div>
-            <div class="field">
-              <label class="field-label">File Audio</label>
+            <div class="card-header"><span class="card-title">Denoise Audio</span><span class="card-desc">noisereduce · Python 3.12</span></div>
+            <div class="field"><label class="field-label">File Audio</label>
               <div class="input-group">
                 <input type="text" id="denoise-file" placeholder="Pilih file audio..." />
-                <button class="btn-icon" onclick="browseOutputFolder('denoise-file')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
+                <button class="btn-icon" onclick="browseOutputFolder('denoise-file')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
               </div>
             </div>
             <div class="form-grid">
-              <div class="field">
-                <label class="field-label">Strength <span id="denoise-strength-val" class="field-badge">75%</span></label>
-                <input type="range" id="denoise-strength" value="75" min="0" max="100" oninput="document.getElementById('denoise-strength-val').textContent=this.value+'%'" />
-              </div>
-              <div class="field">
-                <label class="field-label">Chunk Size <span class="field-badge">RAM safety</span></label>
-                <input type="number" id="denoise-chunk" value="30000" />
-              </div>
+              <div class="field"><label class="field-label">Strength <span id="denoise-strength-val" class="field-badge">75%</span></label><input type="range" id="denoise-strength" value="75" min="0" max="100" oninput="document.getElementById('denoise-strength-val').textContent=this.value+'%'" /></div>
+              <div class="field"><label class="field-label">Chunk Size <span class="field-badge">RAM safety</span></label><input type="number" id="denoise-chunk" value="30000" /></div>
             </div>
-            <div class="field">
-              <label class="field-label">Output</label>
+            <div class="field"><label class="field-label">Output</label>
               <div class="input-group">
                 <input type="text" id="denoise-output" placeholder="Otomatis dari workspace..." />
-                <button class="btn-icon" onclick="browseOutputFolder('denoise-output')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
+                <button class="btn-icon" onclick="browseOutputFolder('denoise-output')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
               </div>
             </div>
             <button class="btn-process" onclick="runProcess('denoise')">Denoise</button>
@@ -284,40 +279,16 @@
         <!-- MERGE -->
         <div id="tab-merge" class="tab-panel">
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Merge Audio</span>
-              <span class="card-desc">Gabungkan beberapa audio</span>
-            </div>
+            <div class="card-header"><span class="card-title">Merge Audio</span><span class="card-desc">Gabungkan beberapa audio</span></div>
             <div id="merge-audio-list">
-              <div class="merge-item">
-                <span class="merge-num">1</span>
-                <div class="input-group" style="flex:1">
-                  <input type="text" placeholder="Path audio 1..." class="merge-path" />
-                  <button class="btn-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  </button>
-                </div>
-                <input type="number" value="100" min="0" max="200" class="merge-vol" title="Volume %" />
-              </div>
-              <div class="merge-item">
-                <span class="merge-num">2</span>
-                <div class="input-group" style="flex:1">
-                  <input type="text" placeholder="Path audio 2..." class="merge-path" />
-                  <button class="btn-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  </button>
-                </div>
-                <input type="number" value="100" min="0" max="200" class="merge-vol" title="Volume %" />
-              </div>
+              <div class="merge-item"><span class="merge-num">1</span><div class="input-group" style="flex:1"><input type="text" placeholder="Path audio 1..." class="merge-path" /><button class="btn-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button></div><input type="number" value="100" min="0" max="200" class="merge-vol" title="Volume %" /></div>
+              <div class="merge-item"><span class="merge-num">2</span><div class="input-group" style="flex:1"><input type="text" placeholder="Path audio 2..." class="merge-path" /><button class="btn-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button></div><input type="number" value="100" min="0" max="200" class="merge-vol" title="Volume %" /></div>
             </div>
             <button class="btn-secondary" onclick="addMergeItem()" style="margin-top:8px">+ Tambah Audio</button>
-            <div class="field" style="margin-top:16px">
-              <label class="field-label">Output</label>
+            <div class="field" style="margin-top:16px"><label class="field-label">Output</label>
               <div class="input-group">
                 <input type="text" id="merge-output" placeholder="Otomatis dari workspace..." />
-                <button class="btn-icon" onclick="browseOutputFolder('merge-output')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
+                <button class="btn-icon" onclick="browseOutputFolder('merge-output')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
               </div>
             </div>
             <button class="btn-process" onclick="runProcess('merge')">Merge Audio</button>
@@ -327,39 +298,18 @@
         <!-- THUMBNAIL -->
         <div id="tab-thumbnail" class="tab-panel">
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">Extract Thumbnail</span>
-              <span class="card-desc">Ambil frame + overlay teks</span>
-            </div>
+            <div class="card-header"><span class="card-title">Extract Thumbnail</span><span class="card-desc">Ambil frame + overlay teks</span></div>
             <div class="form-grid">
-              <div class="field">
-                <label class="field-label">Judul (Baris 1)</label>
-                <input type="text" id="thumb-text1" placeholder="Rainy Night ASMR" />
-              </div>
-              <div class="field">
-                <label class="field-label">Sub Judul (Baris 2)</label>
-                <input type="text" id="thumb-text2" placeholder="City Lights · Lake View · 1 Hour" />
-              </div>
-              <div class="field">
-                <label class="field-label">Ukuran Font</label>
-                <input type="number" id="thumb-size1" value="72" />
-              </div>
-              <div class="field">
-                <label class="field-label">Frame (detik ke-)</label>
-                <input type="number" id="thumb-frame" value="1" min="0" />
-              </div>
+              <div class="field"><label class="field-label">Judul (Baris 1)</label><input type="text" id="thumb-text1" placeholder="Rainy Night ASMR" /></div>
+              <div class="field"><label class="field-label">Sub Judul (Baris 2)</label><input type="text" id="thumb-text2" placeholder="City Lights · Lake View · 1 Hour" /></div>
+              <div class="field"><label class="field-label">Ukuran Font</label><input type="number" id="thumb-size1" value="72" /></div>
+              <div class="field"><label class="field-label">Frame (detik ke-)</label><input type="number" id="thumb-frame" value="1" min="0" /></div>
             </div>
-            <div class="field">
-              <label class="field-label">Warna Teks</label>
-              <input type="color" id="thumb-color" value="#ffffff" />
-            </div>
-            <div class="field">
-              <label class="field-label">Output</label>
+            <div class="field"><label class="field-label">Warna Teks</label><input type="color" id="thumb-color" value="#ffffff" /></div>
+            <div class="field"><label class="field-label">Output</label>
               <div class="input-group">
                 <input type="text" id="thumb-output" placeholder="Otomatis dari workspace..." />
-                <button class="btn-icon" onclick="browseOutputFolder('thumb-output')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
+                <button class="btn-icon" onclick="browseOutputFolder('thumb-output')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
               </div>
             </div>
             <button class="btn-process" onclick="runProcess('thumbnail')">Extract Thumbnail</button>
@@ -369,52 +319,16 @@
         <!-- ALL IN ONE -->
         <div id="tab-all" class="tab-panel">
           <div class="form-card">
-            <div class="card-header">
-              <span class="card-title">All-in-One Pipeline</span>
-              <span class="card-desc">Crop → Upscale → Loop V2 → Thumbnail</span>
-            </div>
+            <div class="card-header"><span class="card-title">All-in-One Pipeline</span><span class="card-desc">Crop → Upscale → Loop V2 → Thumbnail</span></div>
             <div class="form-grid">
-              <div class="field">
-                <label class="field-label">Output Folder</label>
-                <div class="input-group">
-                  <input type="text" id="all-output-dir" placeholder="C:\output" />
-                  <button class="btn-icon" onclick="browseOutputFolder('all-output-dir')">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="field">
-                <label class="field-label">Crop (px bawah)</label>
-                <input type="number" id="all-crop-px" value="50" />
-              </div>
-              <div class="field">
-                <label class="field-label">Durasi Loop (detik)</label>
-                <div class="preset-group">
-                  <button class="preset-btn" onclick="document.getElementById('all-duration').value=3600">1j</button>
-                  <button class="preset-btn" onclick="document.getElementById('all-duration').value=10800">3j</button>
-                  <button class="preset-btn" onclick="document.getElementById('all-duration').value=28800">8j</button>
-                </div>
-                <input type="number" id="all-duration" value="3600" />
-              </div>
-              <div class="field">
-                <label class="field-label">Crossfade V2 (detik)</label>
-                <input type="number" id="all-crossfade" value="0.3" step="0.1" min="0.1" max="2" />
-              </div>
-              <div class="field">
-                <label class="field-label">Thumbnail Teks 1</label>
-                <input type="text" id="all-thumb1" placeholder="Rainy Night ASMR" />
-              </div>
-              <div class="field">
-                <label class="field-label">Thumbnail Teks 2</label>
-                <input type="text" id="all-thumb2" placeholder="City Lights · 1 Hour" />
-              </div>
+              <div class="field"><label class="field-label">Output Folder</label><div class="input-group"><input type="text" id="all-output-dir" placeholder="C:\output" /><button class="btn-icon" onclick="browseOutputFolder('all-output-dir')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button></div></div>
+              <div class="field"><label class="field-label">Crop (px bawah)</label><input type="number" id="all-crop-px" value="50" /></div>
+              <div class="field"><label class="field-label">Durasi Loop (detik)</label><div class="preset-group"><button class="preset-btn" onclick="document.getElementById('all-duration').value=3600">1j</button><button class="preset-btn" onclick="document.getElementById('all-duration').value=10800">3j</button><button class="preset-btn" onclick="document.getElementById('all-duration').value=28800">8j</button></div><input type="number" id="all-duration" value="3600" /></div>
+              <div class="field"><label class="field-label">Crossfade V2 (detik)</label><input type="number" id="all-crossfade" value="0.3" step="0.1" min="0.1" max="2" /></div>
+              <div class="field"><label class="field-label">Thumbnail Teks 1</label><input type="text" id="all-thumb1" placeholder="Rainy Night ASMR" /></div>
+              <div class="field"><label class="field-label">Thumbnail Teks 2</label><input type="text" id="all-thumb2" placeholder="City Lights · 1 Hour" /></div>
             </div>
-            <div class="field">
-              <label class="checkbox-label">
-                <input type="checkbox" id="all-upscale" checked />
-                <span>Aktifkan upscale ke 1080p</span>
-              </label>
-            </div>
+            <div class="field"><label class="checkbox-label"><input type="checkbox" id="all-upscale" checked /><span>Aktifkan upscale ke 1080p</span></label></div>
             <button class="btn-process btn-process--accent" onclick="runProcessAll()">Jalankan Pipeline</button>
           </div>
         </div>
@@ -426,16 +340,12 @@
         <div class="progress-header">
           <span id="progress-info" class="progress-status">Siap</span>
           <div id="timer-box" class="timer-inline hidden">
-            <span class="timer-label">Step</span>
-            <span id="timer-step" class="timer-val">0s</span>
+            <span class="timer-label">Step</span><span id="timer-step" class="timer-val">0s</span>
             <span class="timer-sep">·</span>
-            <span class="timer-label">Total</span>
-            <span id="timer-total" class="timer-val">0s</span>
+            <span class="timer-label">Total</span><span id="timer-total" class="timer-val">0s</span>
           </div>
         </div>
-        <div class="progress-bar-wrap">
-          <div id="progress-bar" class="progress-bar"></div>
-        </div>
+        <div class="progress-bar-wrap"><div id="progress-bar" class="progress-bar"></div></div>
         <div id="log-box"></div>
         <button id="btn-open-folder" class="btn-secondary hidden" onclick="openFolder()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -455,9 +365,14 @@
       if (panel) panel.classList.add('active');
       const btn = document.querySelector('[data-tab="' + name + '"]');
       if (btn) btn.classList.add('active');
-      const titles = {video:'Video Pipeline',audio:'Audio Loop',denoise:'Denoise Audio',merge:'Merge Audio',thumbnail:'Thumbnail',all:'All-in-One Pipeline'};
+      const titles = {
+        video:'Video Pipeline', 'extract-audio':'Extract Audio',
+        audio:'Audio Loop', denoise:'Denoise Audio',
+        merge:'Merge Audio', thumbnail:'Thumbnail', all:'All-in-One Pipeline'
+      };
       document.getElementById('topbar-title').textContent = titles[name] || name;
     }
+
     function addMergeItem() {
       const list = document.getElementById('merge-audio-list');
       const n = list.children.length + 1;
@@ -465,6 +380,48 @@
       div.className = 'merge-item';
       div.innerHTML = `<span class="merge-num">${n}</span><div class="input-group" style="flex:1"><input type="text" placeholder="Path audio ${n}..." class="merge-path" /><button class="btn-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button></div><input type="number" value="100" min="0" max="200" class="merge-vol" title="Volume %" />`;
       list.appendChild(div);
+    }
+
+    async function runExtractAudio() {
+      const inputPath = document.getElementById('extract-input').value.trim()
+                     || document.getElementById('file-path').value.trim();
+      if (!inputPath) { alert('Pilih atau load file video terlebih dahulu!'); return; }
+      const fmt = document.querySelector('input[name="extract-fmt"]:checked')?.value || 'mp3';
+      const outputPath = document.getElementById('extract-output').value.trim();
+      const workspace = document.getElementById('workspace-dir').value.trim();
+
+      const logBox = document.getElementById('log-box');
+      const progressBar = document.getElementById('progress-bar');
+      const progressInfo = document.getElementById('progress-info');
+      logBox.textContent = '';
+      progressBar.style.width = '10%';
+      progressInfo.textContent = 'Extracting audio...';
+      document.getElementById('btn-open-folder').classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/extract-audio', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ input_path: inputPath, output_path: outputPath, format: fmt, workspace })
+        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value);
+          logBox.textContent += text;
+          logBox.scrollTop = logBox.scrollHeight;
+          if (text.includes('[DONE]')) {
+            progressBar.style.width = '100%';
+            progressInfo.textContent = 'Selesai!';
+            document.getElementById('btn-open-folder').classList.remove('hidden');
+          }
+        }
+      } catch(e) {
+        logBox.textContent += '[ERROR] ' + e.message;
+        progressInfo.textContent = 'Error';
+      }
     }
   </script>
 </body>
