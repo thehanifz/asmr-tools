@@ -1,278 +1,326 @@
 <!DOCTYPE html>
 <html lang="id" data-theme="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ASMR Video Tool</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASMR Tools</title>
+  <link rel="stylesheet" href="/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- HEADER -->
-  <header class="app-header">
-    <div class="header-brand">
-      <svg class="logo" viewBox="0 0 32 32" fill="none" aria-label="ASMR Tools">
-        <rect x="2" y="8" width="6" height="16" rx="3" fill="currentColor" opacity="0.4"/>
-        <rect x="10" y="4" width="6" height="24" rx="3" fill="currentColor" opacity="0.7"/>
-        <rect x="18" y="10" width="6" height="12" rx="3" fill="currentColor" opacity="0.4"/>
-        <rect x="26" y="13" width="4" height="6" rx="2" fill="currentColor" opacity="0.3"/>
-      </svg>
-      <span class="brand-name">ASMR Video Tool</span>
-    </div>
-    <div class="header-meta">
-      <span class="badge" id="ffmpeg-status">FFmpeg</span>
-      <span class="version-tag">v2.0</span>
-    </div>
-  </header>
+<!-- APP SHELL -->
+<div class="app">
 
-  <!-- MAIN WORKSPACE -->
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-label="ASMR Tools">
+        <rect width="28" height="28" rx="6" fill="#0d9488"/>
+        <path d="M7 14 Q10 8 14 14 Q18 20 21 14" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="14" cy="14" r="2" fill="white"/>
+      </svg>
+      <span class="sidebar-logo-text">ASMR Tools</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-tool="video">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="16" height="16" rx="2"/><polygon points="22,4 22,20 16,12"/></svg>
+        <span>Video</span>
+      </button>
+      <button class="nav-item" data-tool="audio">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span>Audio</span>
+      </button>
+      <button class="nav-item" data-tool="denoise">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <span>Denoise</span>
+      </button>
+      <button class="nav-item" data-tool="merge">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        <span>Merge</span>
+      </button>
+      <button class="nav-item" data-tool="thumbnail">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+        <span>Thumbnail</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-workspace">
+      <div class="workspace-label">Workspace</div>
+      <div class="workspace-path" id="workspacePath">—</div>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA -->
   <main class="workspace">
 
-    <!-- PANEL 1: VIDEO -->
-    <section class="panel" id="panel-video">
-      <div class="panel-header">
-        <div class="panel-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 8 6 4-6 4V8z"/></svg>
-          Video
-        </div>
-        <span class="panel-status" id="video-status">—</span>
+    <!-- ═══════════════════════════════ VIDEO ═══ -->
+    <section class="tool-panel" id="tool-video">
+      <div class="tool-header">
+        <h1 class="tool-title">Video Pipeline</h1>
+        <span class="tool-badge">Crop → Upscale → Loop</span>
       </div>
 
-      <div class="panel-body">
-        <!-- File input -->
-        <div class="field">
+      <div class="tool-body">
+        <div class="field-group">
           <label class="field-label">File Video</label>
-          <div class="file-drop" id="video-drop">
-            <input type="text" class="input" id="video-path" placeholder="/path/to/video.mp4" readonly />
-            <button class="btn btn-ghost" id="video-browse">Browse</button>
+          <div class="file-row">
+            <input type="text" id="videoInput" class="file-input" placeholder="Pilih file video..." readonly>
+            <button class="btn btn-secondary" id="videoBrowse">Browse</button>
+          </div>
+          <div class="file-info" id="videoInfo"></div>
+        </div>
+
+        <div class="controls-grid">
+          <div class="field-group">
+            <label class="field-label">Crop Atas (px)</label>
+            <input type="number" id="cropTop" class="input" value="0" min="0">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Crop Bawah (px)</label>
+            <input type="number" id="cropBottom" class="input" value="0" min="0">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Crop Kiri (px)</label>
+            <input type="number" id="cropLeft" class="input" value="0" min="0">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Crop Kanan (px)</label>
+            <input type="number" id="cropRight" class="input" value="0" min="0">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Upscale</label>
+            <select id="upscaleRes" class="input">
+              <option value="">— Skip —</option>
+              <option value="1920:1080">FHD 1920×1080</option>
+              <option value="2560:1440">QHD 2560×1440</option>
+              <option value="3840:2160">4K 3840×2160</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Durasi Loop (detik)</label>
+            <input type="number" id="videoDuration" class="input" value="3600" min="1">
           </div>
         </div>
 
-        <!-- Probe result -->
-        <div class="probe-card" id="video-probe" style="display:none">
-          <div class="probe-row"><span>Resolusi</span><strong id="v-res">—</strong></div>
-          <div class="probe-row"><span>Durasi</span><strong id="v-dur">—</strong></div>
-          <div class="probe-row"><span>FPS</span><strong id="v-fps">—</strong></div>
-          <div class="probe-row"><span>Codec</span><strong id="v-codec">—</strong></div>
-          <div class="probe-row"><span>Bitrate</span><strong id="v-bitrate">—</strong></div>
-          <div class="probe-row"><span>Ukuran</span><strong id="v-size">—</strong></div>
+        <div class="checkbox-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="videoKeepAudio">
+            <span class="checkmark"></span>
+            Pertahankan suara original video
+          </label>
         </div>
 
-        <div class="divider"></div>
-
-        <!-- Crop -->
-        <div class="field">
-          <label class="field-label">Crop <span class="hint">(px dari sisi)</span></label>
-          <div class="row-4">
-            <input type="number" class="input" id="crop-top" placeholder="Top" min="0" value="0" />
-            <input type="number" class="input" id="crop-bottom" placeholder="Bottom" min="0" value="0" />
-            <input type="number" class="input" id="crop-left" placeholder="Left" min="0" value="0" />
-            <input type="number" class="input" id="crop-right" placeholder="Right" min="0" value="0" />
-          </div>
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="videoOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
         </div>
 
-        <!-- Upscale -->
-        <div class="field">
-          <label class="field-label">Upscale Target</label>
-          <select class="input" id="upscale-res">
-            <option value="">— Skip —</option>
-            <option value="1920:1080">1920×1080 (FHD)</option>
-            <option value="2560:1440">2560×1440 (QHD)</option>
-            <option value="3840:2160">3840×2160 (4K)</option>
-          </select>
-        </div>
+        <button class="btn btn-primary btn-full" id="videoProcess">▶ Proses Video</button>
 
-        <!-- Loop -->
-        <div class="field">
-          <label class="field-label">Loop Video Ke (detik)</label>
-          <input type="number" class="input" id="video-loop-dur" placeholder="mis. 3600" min="1" />
+        <div class="progress-wrap" id="videoProgressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="videoProgressFill"></div></div>
+          <div class="progress-label" id="videoProgressLabel"></div>
         </div>
-
-        <!-- Output -->
-        <div class="field">
-          <label class="field-label">Output Video</label>
-          <input type="text" class="input" id="video-output" placeholder="/path/output_video.mp4" />
-        </div>
-
-        <button class="btn btn-primary w-full" id="video-run">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
-          Proses Video
-        </button>
-
-        <!-- Log -->
-        <div class="log-box" id="video-log" style="display:none"></div>
-        <div class="progress-bar" id="video-progress" style="display:none">
-          <div class="progress-fill" id="video-progress-fill"></div>
-        </div>
+        <div class="log-box" id="videoLog"></div>
       </div>
     </section>
 
-    <!-- PANEL 2: AUDIO -->
-    <section class="panel" id="panel-audio">
-      <div class="panel-header">
-        <div class="panel-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          Audio
-        </div>
-        <span class="panel-status" id="audio-status">—</span>
+    <!-- ═══════════════════════════════ AUDIO ═══ -->
+    <section class="tool-panel hidden" id="tool-audio">
+      <div class="tool-header">
+        <h1 class="tool-title">Audio Loop</h1>
+        <span class="tool-badge">Loop + Normalize + Fade</span>
       </div>
 
-      <div class="panel-body">
-        <!-- File input -->
-        <div class="field">
+      <div class="tool-body">
+        <div class="field-group">
           <label class="field-label">File Audio</label>
-          <div class="file-drop">
-            <input type="text" class="input" id="audio-path" placeholder="/path/to/audio.mp3" readonly />
-            <button class="btn btn-ghost" id="audio-browse">Browse</button>
+          <div class="file-row">
+            <input type="text" id="audioInput" class="file-input" placeholder="Pilih file audio..." readonly>
+            <button class="btn btn-secondary" id="audioBrowse">Browse</button>
+          </div>
+          <div class="file-info" id="audioInfo"></div>
+        </div>
+
+        <div class="controls-grid">
+          <div class="field-group">
+            <label class="field-label">Durasi (detik)</label>
+            <input type="number" id="audioDuration" class="input" value="3600" min="1">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Target LUFS</label>
+            <input type="number" id="audioLufs" class="input" value="-14" step="0.5">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Fade In (detik)</label>
+            <input type="number" id="audioFadeIn" class="input" value="3" min="0" step="0.5">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Fade Out (detik)</label>
+            <input type="number" id="audioFadeOut" class="input" value="5" min="0" step="0.5">
           </div>
         </div>
 
-        <!-- Probe -->
-        <div class="probe-card" id="audio-probe" style="display:none">
-          <div class="probe-row"><span>Durasi</span><strong id="a-dur">—</strong></div>
-          <div class="probe-row"><span>Codec</span><strong id="a-codec">—</strong></div>
-          <div class="probe-row"><span>Sample Rate</span><strong id="a-sr">—</strong></div>
-          <div class="probe-row"><span>Channels</span><strong id="a-ch">—</strong></div>
-          <div class="probe-row"><span>Bitrate</span><strong id="a-bitrate">—</strong></div>
-          <div class="probe-row"><span>Ukuran</span><strong id="a-size">—</strong></div>
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="audioOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
         </div>
 
-        <div class="divider"></div>
+        <button class="btn btn-primary btn-full" id="audioProcess">▶ Proses Audio</button>
 
-        <!-- Loop duration -->
-        <div class="field">
-          <label class="field-label">Loop Audio Ke (detik)</label>
-          <input type="number" class="input" id="audio-loop-dur" placeholder="mis. 3600" min="1" />
+        <div class="progress-wrap" id="audioProgressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="audioProgressFill"></div></div>
+          <div class="progress-label" id="audioProgressLabel"></div>
         </div>
-
-        <!-- Normalize -->
-        <div class="field">
-          <label class="field-label">Normalize LUFS <span class="hint">(opsional)</span></label>
-          <input type="number" class="input" id="audio-lufs" placeholder="mis. -14" />
-        </div>
-
-        <!-- Fade -->
-        <div class="field">
-          <label class="field-label">Fade (detik)</label>
-          <div class="row-2">
-            <div>
-              <label class="field-sublabel">Fade In</label>
-              <input type="number" class="input" id="audio-fade-in" placeholder="3" min="0" value="3" />
-            </div>
-            <div>
-              <label class="field-sublabel">Fade Out</label>
-              <input type="number" class="input" id="audio-fade-out" placeholder="5" min="0" value="5" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Output -->
-        <div class="field">
-          <label class="field-label">Output Audio</label>
-          <input type="text" class="input" id="audio-output" placeholder="/path/output_audio.flac" />
-        </div>
-
-        <button class="btn btn-primary w-full" id="audio-run">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
-          Proses Audio
-        </button>
-
-        <div class="log-box" id="audio-log" style="display:none"></div>
-        <div class="progress-bar" id="audio-progress" style="display:none">
-          <div class="progress-fill" id="audio-progress-fill"></div>
-        </div>
+        <div class="log-box" id="audioLog"></div>
       </div>
     </section>
 
-    <!-- PANEL 3: MERGE & EXPORT -->
-    <section class="panel" id="panel-merge">
-      <div class="panel-header">
-        <div class="panel-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3"/><path d="M12 3v10"/><path d="m8 9 4-4 4 4"/></svg>
-          Merge & Export
-        </div>
-        <span class="panel-status" id="merge-status">—</span>
+    <!-- ═══════════════════════════════ DENOISE ═══ -->
+    <section class="tool-panel hidden" id="tool-denoise">
+      <div class="tool-header">
+        <h1 class="tool-title">Denoise Audio</h1>
+        <span class="tool-badge">noisereduce · Python 3.12</span>
       </div>
 
-      <div class="panel-body">
-        <!-- Video input -->
-        <div class="field">
-          <label class="field-label">File Video</label>
-          <div class="file-drop">
-            <input type="text" class="input" id="merge-video" placeholder="/path/video.mp4" readonly />
-            <button class="btn btn-ghost" id="merge-video-browse">Browse</button>
-          </div>
-        </div>
-
-        <!-- Audio input -->
-        <div class="field">
+      <div class="tool-body">
+        <div class="field-group">
           <label class="field-label">File Audio</label>
-          <div class="file-drop">
-            <input type="text" class="input" id="merge-audio" placeholder="/path/audio.flac" readonly />
-            <button class="btn btn-ghost" id="merge-audio-browse">Browse</button>
+          <div class="file-row">
+            <input type="text" id="denoiseInput" class="file-input" placeholder="Pilih file audio..." readonly>
+            <button class="btn btn-secondary" id="denoiseBrowse">Browse</button>
+          </div>
+          <div class="file-info" id="denoiseInfo"></div>
+        </div>
+
+        <div class="controls-grid">
+          <div class="field-group">
+            <label class="field-label">Strength <span class="hint" id="denoiseStrengthVal">75%</span></label>
+            <input type="range" id="denoiseStrength" class="slider" min="0" max="100" value="75">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Chunk Size <span class="hint">(RAM safety)</span></label>
+            <input type="number" id="denoiseChunk" class="input" value="30000" min="5000" step="5000">
           </div>
         </div>
 
-        <!-- Output -->
-        <div class="field">
-          <label class="field-label">Output Final</label>
-          <input type="text" class="input" id="merge-output" placeholder="/path/final.mp4" />
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="denoiseOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
         </div>
 
-        <button class="btn btn-primary w-full" id="merge-run">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 7H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3"/><path d="M12 3v10"/><path d="m8 9 4-4 4 4"/></svg>
-          Merge Video + Audio
-        </button>
+        <button class="btn btn-primary btn-full" id="denoiseProcess">▶ Denoise</button>
 
-        <div class="divider"></div>
+        <div class="progress-wrap" id="denoiseProgressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="denoiseProgressFill"></div></div>
+          <div class="progress-label" id="denoiseProgressLabel"></div>
+        </div>
+        <div class="log-box" id="denoiseLog"></div>
+      </div>
+    </section>
 
-        <!-- Thumbnail -->
-        <div class="panel-subtitle">Thumbnail</div>
+    <!-- ═══════════════════════════════ MERGE ═══ -->
+    <section class="tool-panel hidden" id="tool-merge">
+      <div class="tool-header">
+        <h1 class="tool-title">Merge</h1>
+        <span class="tool-badge">Video + Multi Audio</span>
+      </div>
 
-        <div class="field">
-          <label class="field-label">File Video (untuk thumbnail)</label>
-          <div class="file-drop">
-            <input type="text" class="input" id="thumb-video" placeholder="/path/video.mp4" readonly />
-            <button class="btn btn-ghost" id="thumb-video-browse">Browse</button>
+      <div class="tool-body">
+        <div class="field-group">
+          <label class="field-label">File Video</label>
+          <div class="file-row">
+            <input type="text" id="mergeVideo" class="file-input" placeholder="Dari Video Pipeline..." readonly>
+            <button class="btn btn-secondary" id="mergeVideoBrowse">Browse</button>
           </div>
         </div>
 
-        <div class="field">
-          <label class="field-label">Waktu (detik)</label>
-          <input type="number" class="input" id="thumb-time" value="5" min="0" />
+        <div class="field-group">
+          <label class="field-label">Audio Layers <span class="hint">(max 4)</span></label>
+          <div id="audioLayers"></div>
+          <button class="btn btn-ghost btn-add" id="addAudioLayer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Tambah Audio
+          </button>
         </div>
 
-        <div class="field">
-          <label class="field-label">Output Thumbnail</label>
-          <input type="text" class="input" id="thumb-output" placeholder="/path/thumbnail.jpg" />
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="mergeOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
         </div>
 
-        <button class="btn btn-secondary w-full" id="thumb-run">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
-          Ambil Thumbnail
-        </button>
+        <button class="btn btn-primary btn-full" id="mergeProcess">▶ Merge</button>
 
-        <!-- Thumb preview -->
-        <div id="thumb-preview-wrap" style="display:none">
-          <img id="thumb-preview" alt="Thumbnail preview" loading="lazy" class="thumb-img" />
+        <div class="progress-wrap" id="mergeProgressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="mergeProgressFill"></div></div>
+          <div class="progress-label" id="mergeProgressLabel"></div>
+        </div>
+        <div class="log-box" id="mergeLog"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════ THUMBNAIL ═══ -->
+    <section class="tool-panel hidden" id="tool-thumbnail">
+      <div class="tool-header">
+        <h1 class="tool-title">Thumbnail</h1>
+        <span class="tool-badge">Extract Frame + Preview</span>
+      </div>
+
+      <div class="tool-body">
+        <div class="field-group">
+          <label class="field-label">File Video</label>
+          <div class="file-row">
+            <input type="text" id="thumbInput" class="file-input" placeholder="Pilih file video..." readonly>
+            <button class="btn btn-secondary" id="thumbBrowse">Browse</button>
+          </div>
+          <div class="file-info" id="thumbInfo"></div>
         </div>
 
-        <div class="log-box" id="merge-log" style="display:none"></div>
-        <div class="progress-bar" id="merge-progress" style="display:none">
-          <div class="progress-fill" id="merge-progress-fill"></div>
+        <div class="controls-grid">
+          <div class="field-group">
+            <label class="field-label">Waktu (detik)</label>
+            <input type="number" id="thumbTime" class="input" value="5" min="0" step="0.5">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Teks Baris 1</label>
+            <input type="text" id="thumbText1" class="input" placeholder="Judul video...">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Teks Baris 2</label>
+            <input type="text" id="thumbText2" class="input" placeholder="Subtitle...">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Warna Teks</label>
+            <select id="thumbColor" class="input">
+              <option value="white">White</option>
+              <option value="yellow">Yellow</option>
+              <option value="black">Black</option>
+            </select>
+          </div>
         </div>
+
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="thumbOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="thumbProcess">▶ Extract Thumbnail</button>
+        <div class="log-box" id="thumbLog"></div>
+
+        <div class="thumb-preview" id="thumbPreview"></div>
       </div>
     </section>
 
   </main>
 
   <!-- TOAST -->
-  <div class="toast-container" id="toast-container"></div>
+  <div class="toast-container" id="toastContainer"></div>
 
-  <!-- JS Modules -->
-  <script type="module" src="./js/main.js"></script>
+</div>
+
+<script type="module" src="/js/main.js"></script>
 </body>
 </html>

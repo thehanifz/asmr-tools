@@ -1,119 +1,114 @@
-/**
- * Panel Merge & Export — wired to HTML ids from index.html v2
- */
-import { state } from "./state.js";
-import { probeFile, browseVideo, browseAudio, mergeFiles, makeThumbnail } from "./api.js";
-import { toast, log, clearLog, setProgress, setProgressIndeterminate,
-         setPanelReady, setPanelProcessing, setPanelIdle } from "./ui.js";
+// ═══════════════════════════════════════════════
+//  Panel: Merge — Video + Multi Audio
+// ═══════════════════════════════════════════════
+import { AppState, setWorkspace, buildOutputPath } from './state.js';
+import { browseVideo, browseAudio }               from './api.js';
+import { toast, consumeSSE }                      from './ui.js';
 
-const P = "merge";
+let audioLayerCount = 0;
 
-export function initMergePanel() {
-  // Auto-fill from video/audio ready events
-  document.addEventListener("video:ready", (e) => {
-    const el = document.getElementById("merge-video");
-    if (el && e.detail?.path) el.value = e.detail.path;
+function createAudioLayer(path = "", volume = 100) {
+  const id = ++audioLayerCount;
+  const div = document.createElement("div");
+  div.className = "audio-layer";
+  div.dataset.layerId = id;
+  div.innerHTML = `
+    <input type="text" class="file-input layer-path" placeholder="Pilih audio..." readonly value="${path}">
+    <div class="audio-layer-vol">
+      <input type="number" class="layer-vol" value="${volume}" min="0" max="200" step="5">
+      <span>%</span>
+    </div>
+    <button class="btn-remove" data-id="${id}" title="Hapus layer">×</button>
+  `;
+  // Browse click on path input
+  div.querySelector(".layer-path").addEventListener("click", async () => {
+    const p = await browseAudio();
+    if (p) {
+      div.querySelector(".layer-path").value = p;
+      setWorkspace(p);
+    }
   });
-  document.addEventListener("audio:ready", (e) => {
-    const el = document.getElementById("merge-audio");
-    if (el && e.detail?.path) el.value = e.detail.path;
+  // Remove
+  div.querySelector(".btn-remove").addEventListener("click", () => {
+    div.remove();
+    updateMergeOutput();
   });
+  return div;
+}
 
-  // Browse buttons (manual)
-  document.getElementById("merge-video-browse")?.addEventListener("click", async () => {
-    const res = await browseVideo();
-    if (res?.path) document.getElementById("merge-video").value = res.path;
-  });
-  document.getElementById("merge-audio-browse")?.addEventListener("click", async () => {
-    const res = await browseAudio();
-    if (res?.path) document.getElementById("merge-audio").value = res.path;
-  });
+function updateMergeOutput() {
+  const videoPath = document.getElementById("mergeVideo").value;
+  if (videoPath) {
+    document.getElementById("mergeOutput").value = buildOutputPath(videoPath, "._final", ".mp4");
+  }
+}
 
-  // Auto-suggest merge output
-  document.getElementById("merge-video")?.addEventListener("change", (e) => {
-    const path = e.target.value;
-    if (!path) return;
-    const dir  = path.replace(/[\\/][^\\/]+$/, "");
-    const base = path.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
-    const outEl = document.getElementById("merge-output");
-    if (outEl && !outEl.value) outEl.value = `${dir}\\${base}_final.mp4`;
-  });
+export function initMerge() {
+  const $ = id => document.getElementById(id);
 
-  // Merge run
-  document.getElementById("merge-run")?.addEventListener("click", runMerge);
-
-  // Thumbnail browse + run
-  document.getElementById("thumb-video-browse")?.addEventListener("click", async () => {
-    const res = await browseVideo();
-    if (res?.path) {
-      const el = document.getElementById("thumb-video");
-      if (el) el.value = res.path;
-      // Auto-suggest thumb output
-      const dir  = res.path.replace(/[\\/][^\\/]+$/, "");
-      const base = res.path.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
-      const outEl = document.getElementById("thumb-output");
-      if (outEl && !outEl.value) outEl.value = `${dir}\\${base}_thumbnail.jpg`;
+  // Auto-fill when navigating to merge
+  document.querySelector('.nav-item[data-tool="merge"]')?.addEventListener("click", () => {
+    if (AppState.videoProcessedPath && !$("mergeVideo").value) {
+      $("mergeVideo").value = AppState.videoProcessedPath;
+      updateMergeOutput();
+    }
+    // Add first audio layer from looped path if none exist
+    const layers = document.getElementById("audioLayers");
+    if (layers.children.length === 0 && AppState.audioLoopedPath) {
+      layers.appendChild(createAudioLayer(AppState.audioLoopedPath, 100));
+      updateMergeOutput();
     }
   });
 
-  document.getElementById("thumb-run")?.addEventListener("click", runThumbnail);
-}
+  // Browse video
+  $("mergeVideoBrowse").addEventListener("click", async () => {
+    const p = await browseVideo();
+    if (!p) return;
+    $("mergeVideo").value = p;
+    setWorkspace(p);
+    updateMergeOutput();
+  });
 
-async function runMerge() {
-  const videoPath  = document.getElementById("merge-video")?.value.trim();
-  const audioPath  = document.getElementById("merge-audio")?.value.trim();
-  const outputPath = document.getElementById("merge-output")?.value.trim();
+  // Add audio layer
+  $("addAudioLayer").addEventListener("click", () => {
+    const layers = $("audioLayers");
+    if (layers.children.length >= 4) {
+      toast("Maksimal 4 layer audio", "error");
+      return;
+    }
+    layers.appendChild(createAudioLayer());
+  });
 
-  if (!videoPath)  { toast("Pilih file video!", "error"); return; }
-  if (!audioPath)  { toast("Pilih file audio!", "error"); return; }
-  if (!outputPath) { toast("Isi path output!", "error"); return; }
+  // Process merge
+  $("mergeProcess").addEventListener("click", async () => {
+    const videoPath = $("mergeVideo").value;
+    if (!videoPath) { toast("Pilih file video dulu", "error"); return; }
 
-  setPanelProcessing(P);
-  clearLog(P);
-  setProgress(P, 0);
+    // Collect audio layers
+    const layers = [...$("audioLayers").querySelectorAll(".audio-layer")].map(div => ({
+      path:   div.querySelector(".layer-path").value,
+      volume: parseInt(div.querySelector(".layer-vol").value) || 100,
+    })).filter(l => l.path);
 
-  await mergeFiles({ video: videoPath, audio: audioPath, output: outputPath }, (ev) => {
-    if (ev.log) {
-      log(P, ev.log);
-    } else if (ev.type === "done" || ev.status === "done") {
-      setProgress(P, 100);
-      log(P, `✅ Merge selesai — ${ev.size ?? ""} ${ev.elapsed ?? ""}`, "done");
-      setPanelReady(P, outputPath.split(/[\\/]/).pop());
-      toast("Merge selesai!", "success");
-    } else if (ev.status === "error") {
-      setPanelIdle(P);
-      log(P, `❌ ${ev.message ?? "Merge error"}`, "error");
-      toast("Merge gagal.", "error");
+    if (layers.length === 0) { toast("Tambahkan minimal 1 audio", "error"); return; }
+
+    const output = $("mergeOutput").value || buildOutputPath(videoPath, "._final", ".mp4");
+
+    const payload = { video: videoPath, audio_layers: layers, output };
+
+    $("mergeProcess").disabled = true;
+    const { ok, finalData } = await consumeSSE(
+      "/api/merge", payload,
+      "mergeLog", "mergeProgressWrap", "mergeProgressFill", "mergeProgressLabel"
+    );
+    $("mergeProcess").disabled = false;
+
+    if (ok) {
+      AppState.mergeFinalPath = output;
+      toast(`Merge selesai · ${finalData?.size || ""}`, "success");
+      document.querySelector('.nav-item[data-tool="merge"]')?.classList.add("done");
+    } else {
+      toast("Merge gagal", "error");
     }
   });
-}
-
-async function runThumbnail() {
-  const videoPath  = document.getElementById("thumb-video")?.value.trim();
-  const outputPath = document.getElementById("thumb-output")?.value.trim();
-  const time       = parseFloat(document.getElementById("thumb-time")?.value ?? 5);
-
-  if (!videoPath)  { toast("Pilih video untuk thumbnail!", "error"); return; }
-  if (!outputPath) { toast("Isi path output thumbnail!", "error"); return; }
-
-  log(P, "Generating thumbnail...");
-  const res = await makeThumbnail({ input: videoPath, output: outputPath, time_sec: time });
-
-  if (res.error) {
-    log(P, `❌ ${res.error}`, "error");
-    toast("Thumbnail gagal.", "error");
-    return;
-  }
-
-  log(P, `🖼️ Thumbnail saved: ${outputPath}`, "done");
-  toast("Thumbnail berhasil!", "success");
-
-  // Show preview via blob URL from server static
-  const preview = document.getElementById("thumb-preview");
-  const wrap    = document.getElementById("thumb-preview-wrap");
-  if (preview && wrap) {
-    // request image from /api/thumbnail/preview?path=...
-    preview.src = `/api/thumbnail/preview?path=${encodeURIComponent(outputPath)}&t=${Date.now()}`;
-    wrap.style.display = "block";
-  }
 }

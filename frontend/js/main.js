@@ -1,28 +1,31 @@
-/**
- * Entry point — initialise all panels.
- */
-import { initVideoPanel } from "./panel-video.js";
-import { initAudioPanel } from "./panel-audio.js";
-import { initMergePanel } from "./panel-merge.js";
+// ═══════════════════════════════════════════════
+//  Main — sidebar routing + module init
+// ═══════════════════════════════════════════════
+import { initVideo }     from './panel-video.js';
+import { initAudio }     from './panel-audio.js';
+import { initDenoise }   from './panel-denoise.js';
+import { initMerge }     from './panel-merge.js';
+import { initThumbnail } from './panel-thumbnail.js';
 
-document.addEventListener("DOMContentLoaded", () => {
-  initVideoPanel();
-  initAudioPanel();
-  initMergePanel();
+const TOOLS = ['video', 'audio', 'denoise', 'merge', 'thumbnail'];
 
-  // FFmpeg badge check
-  fetch("/api/probe", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: "" }),
-  })
-    .then(() => {
-      const badge = document.getElementById("ffmpeg-status");
-      if (badge) { badge.textContent = "FFmpeg ✓"; badge.style.color = "var(--success)"; }
-    })
-    .catch(() => {
-      const badge = document.getElementById("ffmpeg-status");
-      if (badge) { badge.textContent = "FFmpeg ✗"; badge.style.color = "var(--error)";
-                   badge.style.background = "var(--error-dim)"; }
-    });
+function activateTool(name) {
+  TOOLS.forEach(t => {
+    document.getElementById(`tool-${t}`)?.classList.toggle('hidden', t !== name);
+    document.querySelector(`.nav-item[data-tool="${t}"]`)?.classList.toggle('active', t === name);
+  });
+}
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => activateTool(btn.dataset.tool));
 });
+
+// Init all panels
+initVideo();
+initAudio();
+initDenoise();
+initMerge();
+initThumbnail();
+
+// Default: video
+activateTool('video');

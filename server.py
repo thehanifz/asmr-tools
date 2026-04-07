@@ -1,9 +1,9 @@
-"""ASMR Tools v2 - FastAPI entry point."""
+"""ASMR Tools v2 — FastAPI entry point."""
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from api.router import router
 
 app = FastAPI(title="ASMR Tools", version="2.0")
@@ -15,18 +15,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API routes first
 app.include_router(router, prefix="/api")
 
-# Serve frontend JS/CSS as /js/... and /style.css
-# Mount at root level so index.html relative paths work
-app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
-app.mount("/assets", StaticFiles(directory="frontend/assets"), name="assets")
+# Static assets
+if os.path.isdir("frontend/js"):
+    app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
+if os.path.isdir("frontend/assets"):
+    app.mount("/assets", StaticFiles(directory="frontend/assets"), name="assets")
 
 
 @app.get("/style.css")
 async def serve_css():
-    from fastapi.responses import FileResponse
     return FileResponse("frontend/style.css", media_type="text/css")
 
 

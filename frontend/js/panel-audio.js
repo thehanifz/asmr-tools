@@ -1,97 +1,64 @@
-/**
- * Panel Audio — wired to HTML ids from index.html v2
- */
-import { state, emit } from "./state.js";
-import { probeFile, browseAudio, processAudio } from "./api.js";
-import { toast, log, clearLog, setProgress,
-         setPanelReady, setPanelProcessing, setPanelIdle, showProbe } from "./ui.js";
+// ═══════════════════════════════════════════════
+//  Panel: Audio Loop
+// ═══════════════════════════════════════════════
+import { AppState, setWorkspace, buildOutputPath } from './state.js';
+import { browseAudio, probeFile }                  from './api.js';
+import { toast, showFileInfo, consumeSSE }         from './ui.js';
 
-const P = "audio";
+export function initAudio() {
+  const $ = id => document.getElementById(id);
 
-export function initAudioPanel() {
-  document.getElementById("audio-browse")?.addEventListener("click", async () => {
-    const res = await browseAudio();
-    if (res?.path) await loadAudio(res.path);
+  // ── Browse ──────────────────────────────────
+  $("audioBrowse").addEventListener("click", async () => {
+    // Prefer denoised file if available
+    const path = await browseAudio();
+    if (!path) return;
+    $("audioInput").value = path;
+    setWorkspace(path);
+    AppState.audioOriginalPath = path;
+    $("audioOutput").value = buildOutputPath(path, "._looped", ".m4a");
+    const info = await probeFile(path);
+    if (!info.error) showFileInfo("audioInfo", info);
   });
 
-  document.getElementById("audio-run")?.addEventListener("click", runAudioProcess);
-
-  document.getElementById("audio-path")?.addEventListener("change", (e) => {
-    if (e.target.value) loadAudio(e.target.value);
+  // Auto-fill from denoise result when panel becomes active
+  document.querySelector('.nav-item[data-tool="audio"]')?.addEventListener("click", () => {
+    if (AppState.audioDenoisedPath && !$("audioInput").value) {
+      $("audioInput").value = AppState.audioDenoisedPath;
+      $("audioOutput").value = buildOutputPath(AppState.audioDenoisedPath, "._looped", ".m4a");
+    }
   });
-}
 
-async function loadAudio(path) {
-  state.audio.inputPath = path;
-  const el = document.getElementById("audio-path");
-  if (el) el.value = path;
+  // ── Process ─────────────────────────────────
+  $("audioProcess").addEventListener("click", async () => {
+    const input = $("audioInput").value;
+    if (!input) { toast("Pilih file audio dulu", "error"); return; }
 
-  setPanelProcessing(P);
-  const info = await probeFile(path);
-  if (info.error) { toast(info.error, "error"); setPanelIdle(P); return; }
+    const output = $("audioOutput").value || buildOutputPath(input, "._looped", ".m4a");
+    const lufsRaw = $("audioLufs").value;
 
-  state.audio.info = info;
-  renderAudioProbe(info);
-  showProbe(P);
+    const payload = {
+      input,
+      output,
+      duration:  parseInt($("audioDuration").value) || 3600,
+      lufs:      lufsRaw !== "" ? parseFloat(lufsRaw) : null,
+      fade_in:   parseFloat($("audioFadeIn").value)  || 3,
+      fade_out:  parseFloat($("audioFadeOut").value) || 5,
+    };
 
-  // Auto-suggest output
-  const dir  = path.replace(/[\\/][^\\/]+$/, "");
-  const base = path.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
-  const outEl = document.getElementById("audio-output");
-  if (outEl && !outEl.value) outEl.value = `${dir}\\${base}_looped.flac`;
+    $("audioProcess").disabled = true;
+    const { ok, finalData } = await consumeSSE(
+      "/api/audio/loop", payload,
+      "audioLog", "audioProgressWrap", "audioProgressFill", "audioProgressLabel"
+    );
+    $("audioProcess").disabled = false;
 
-  setPanelIdle(P);
-}
-
-function renderAudioProbe(info) {
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? "—"; };
-  set("a-dur",     info.duration_str);
-  set("a-codec",   info.audio_codec);
-  set("a-sr",      info.sample_rate ? `${info.sample_rate} Hz` : "—");
-  set("a-ch",      info.channels);
-  set("a-bitrate", info.bitrate_str);
-  set("a-size",    info.size_str);
-}
-
-async function runAudioProcess() {
-  const inputPath = state.audio.inputPath || document.getElementById("audio-path")?.value.trim();
-  if (!inputPath) { toast("Pilih file audio dulu!", "error"); return; }
-
-  const outputPath = document.getElementById("audio-output")?.value.trim();
-  if (!outputPath) { toast("Isi path output audio!", "error"); return; }
-
-  const loopDur = parseInt(document.getElementById("audio-loop-dur")?.value ?? 3600);
-  const lufs    = parseFloat(document.getElementById("audio-lufs")?.value ?? "") || null;
-  const fadeIn  = parseFloat(document.getElementById("audio-fade-in")?.value ?? 3);
-  const fadeOut = parseFloat(document.getElementById("audio-fade-out")?.value ?? 5);
-
-  const payload = {
-    input:    inputPath,
-    output:   outputPath,
-    duration: loopDur,
-    lufs:     lufs,
-    fade_in:  fadeIn,
-    fade_out: fadeOut,
-  };
-
-  setPanelProcessing(P);
-  clearLog(P);
-  setProgress(P, 0);
-
-  await processAudio(payload, (ev) => {
-    if (ev.log) {
-      log(P, ev.log);
-    } else if (ev.status === "done") {
-      state.audio.outputPath = outputPath;
-      state.audio.ready = true;
-      setProgress(P, 100);
-      setPanelReady(P, outputPath.split(/[\\/]/).pop());
-      toast("Audio selesai!", "success");
-      emit("audio:ready", { path: outputPath });
-    } else if (ev.status === "error") {
-      setPanelIdle(P);
-      log(P, `❌ ${ev.message ?? "Error"}`, "error");
-      toast("Proses audio gagal.", "error");
+    if (ok) {
+      AppState.audioLoopedPath = output;
+      toast(`Audio selesai · ${finalData?.size || ""}`, "success");
+      document.querySelector('.nav-item[data-tool="audio"]')?.classList.add("done");
+    } else {
+      toast("Audio processing gagal", "error");
     }
   });
 }

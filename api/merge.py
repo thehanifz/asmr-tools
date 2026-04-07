@@ -1,4 +1,4 @@
-"""Merge video + audio into final MP4."""
+"""Merge video + multi-audio layers into final MP4."""
 import os
 import json
 import time
@@ -11,34 +11,81 @@ router = APIRouter(tags=["merge"])
 
 @router.post("/merge")
 async def merge_video_audio(request: Request):
-    """
-    Merge a pre-processed video file (no audio) with a pre-processed audio file.
-    Both inputs should already be at the target duration.
-    Uses stream copy — extremely fast, no quality loss.
+    """Merge 1 video + 1-4 audio layers with per-layer volume control.
+
+    Payload:
+      video        : str  — video file path (no audio / audio will be replaced)
+      audio_layers : list — [{path: str, volume: int (0-200)}]
+      output       : str  — final output path
+
+    Also supports legacy format: { video, audio, output }
     """
     data = await request.json()
-    video_path = data["video"]   # _video_looped.mp4
-    audio_path = data["audio"]   # _audio_looped.m4a
-    output_path = data["output"] # final.mp4
+    video_path  = data["video"]
+    output_path = data["output"]
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", video_path,
-        "-i", audio_path,
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-c:v", "copy",
-        "-c:a", "copy",
-        "-shortest",
-        output_path,
-    ]
+    # Support legacy single-audio format
+    if "audio" in data and "audio_layers" not in data:
+        layers = [{"path": data["audio"], "volume": 100}]
+    else:
+        layers = data.get("audio_layers", [])
+
+    layers = [l for l in layers if l.get("path")]  # filter empty
+    if not layers:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Minimal 1 audio layer diperlukan"}, status_code=400)
+
+    n = len(layers)
+
+    # Build ffmpeg command
+    cmd = ["ffmpeg", "-y", "-i", video_path]
+    for l in layers:
+        cmd += ["-i", l["path"]]
+
+    if n == 1:
+        # Single audio — simple map, no filter needed
+        vol = layers[0]["volume"] / 100.0
+        if vol != 1.0:
+            cmd += [
+                "-filter_complex", f"[1:a]volume={vol}[aout]",
+                "-map", "0:v:0",
+                "-map", "[aout]",
+            ]
+        else:
+            cmd += ["-map", "0:v:0", "-map", "1:a:0"]
+    else:
+        # Multi-audio — amix with per-layer volume
+        filter_parts = []
+        mix_inputs = ""
+        for i, l in enumerate(layers):
+            vol = l["volume"] / 100.0
+            label = f"a{i+1}"
+            filter_parts.append(f"[{i+1}:a]volume={vol}[{label}]")
+            mix_inputs += f"[{label}]"
+
+        filter_parts.append(
+            f"{mix_inputs}amix=inputs={n}:duration=first:normalize=0[aout]"
+        )
+        filter_complex = ";".join(filter_parts)
+
+        cmd += [
+            "-filter_complex", filter_complex,
+            "-map", "0:v:0",
+            "-map", "[aout]",
+        ]
+
+    cmd += ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k", output_path]
 
     async def run():
         t_start = time.time()
-        yield f"data: {json.dumps({'type': 'step_start', 'label': '🔧 Mux video + audio'})}\n\n"
+        layer_desc = ", ".join([f"{os.path.basename(l['path'])} ({l['volume']}%)" for l in layers])
+        yield f"data: {json.dumps({'type': 'step_start', 'label': f'🔧 Mux video + {n} audio layer(s)'})}\n\n"
+        yield f"data: {json.dumps({'log': f'Layers: {layer_desc}'})}\n\n"
+
         async for chunk in run_ffmpeg_stream(cmd):
             yield chunk
-        elapsed = time.time() - t_start
+
+        elapsed  = time.time() - t_start
         size_str = get_file_size_str(output_path) if os.path.exists(output_path) else "?"
         yield f"data: {json.dumps({'type': 'done', 'output': output_path, 'size': size_str, 'elapsed': fmt_duration(elapsed)})}\n\n"
 
