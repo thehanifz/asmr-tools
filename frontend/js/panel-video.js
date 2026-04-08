@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════
 //  Panel: Video Pipeline
+//  v2.2.0 — xfade seamless loop + image duration toggle
 // ═══════════════════════════════════════════════
 import { AppState, setWorkspace, buildOutputPath } from './state.js';
 import { browseVideo, probeFile }                  from './api.js';
@@ -8,27 +9,17 @@ import { toast, showFileInfo, consumeSSE }         from './ui.js';
 export function initVideo() {
   const $ = id => document.getElementById(id);
 
-  // ── Helper: toggle .xfade-off class pada wrapper container ──
-  // Tidak menyentuh .disabled sama sekali — hanya class CSS.
+  // ── Toggle .xfade-off class — tidak pakai .disabled, hanya CSS class ──
   function syncXfadeControls(enabled) {
     const wrap = $("xfadeControls");
     if (!wrap) return;
-    if (enabled) {
-      wrap.classList.remove("xfade-off");
-    } else {
-      wrap.classList.add("xfade-off");
-    }
+    wrap.classList.toggle("xfade-off", !enabled);
   }
 
-  // ── Helper: toggle .xfade-off class pada image duration controls ──
   function syncImageDurationControls(enabled) {
     const wrap = $("imageDurationControls");
     if (!wrap) return;
-    if (enabled) {
-      wrap.classList.remove("xfade-off");
-    } else {
-      wrap.classList.add("xfade-off");
-    }
+    wrap.classList.toggle("xfade-off", !enabled);
   }
 
   // ── Browse ──────────────────────────────────
@@ -45,23 +36,21 @@ export function initVideo() {
     AppState.videoDuration = info.duration || 8;
   });
 
-  // ── Keep audio checkbox ──────────────────────
+  // ── Keep audio ────────────────────────────
   $("videoKeepAudio").addEventListener("change", e => {
     AppState.videoKeepAudio = e.target.checked;
   });
 
-  // ── Image Duration toggle ────────────────────
+  // ── Image Duration toggle ───────────────────
   $("videoImageDurationEnabled").addEventListener("change", e => {
     syncImageDurationControls(e.target.checked);
   });
-  // Init: wrapper dimmed karena checkbox default off
   syncImageDurationControls(false);
 
-  // ── XFade toggle ────────────────────────────
+  // ── XFade toggle ───────────────────────────
   $("videoXfadeEnabled").addEventListener("change", e => {
     syncXfadeControls(e.target.checked);
   });
-  // Init: wrapper dimmed karena checkbox default off
   syncXfadeControls(false);
 
   // ── Process ─────────────────────────────────
