@@ -8,6 +8,17 @@ import { toast, showFileInfo, consumeSSE }         from './ui.js';
 export function initVideo() {
   const $ = id => document.getElementById(id);
 
+  // ── Helper: sync state enable/disable input xfade ──
+  function syncXfadeInputs(enabled) {
+    const dur  = $("videoXfadeDuration");
+    const type = $("videoXfadeType");
+    if (!dur || !type) return;
+    dur.disabled  = !enabled;
+    type.disabled = !enabled;
+    dur.style.opacity  = enabled ? "1" : "0.4";
+    type.style.opacity = enabled ? "1" : "0.4";
+  }
+
   // ── Browse ──────────────────────────────────
   $("videoBrowse").addEventListener("click", async () => {
     const path = await browseVideo();
@@ -15,9 +26,7 @@ export function initVideo() {
     $("videoInput").value = path;
     setWorkspace(path);
     AppState.videoOriginalPath = path;
-    // Auto-output
     $("videoOutput").value = buildOutputPath(path, "._processed", ".mp4");
-    // Probe
     const info = await probeFile(path);
     if (info.error) { toast(info.error, "error"); return; }
     showFileInfo("videoInfo", info);
@@ -29,11 +38,12 @@ export function initVideo() {
     AppState.videoKeepAudio = e.target.checked;
   });
 
-  // ── Xfade toggle: tampilkan/sembunyikan field detik ──
+  // ── XFade toggle: enable/disable field input detik & tipe ──
   $("videoXfadeEnabled").addEventListener("change", e => {
-    const wrap = $("xfadeDurationWrap");
-    if (wrap) wrap.style.display = e.target.checked ? "" : "none";
+    syncXfadeInputs(e.target.checked);
   });
+  // Inisialisasi state awal (checkbox off → input disabled)
+  syncXfadeInputs(false);
 
   // ── Process ─────────────────────────────────
   $("videoProcess").addEventListener("click", async () => {
@@ -70,7 +80,6 @@ export function initVideo() {
     if (ok && finalData) {
       AppState.videoProcessedPath = finalData.output || output;
       toast(`Video selesai · ${finalData.final_size || ""}`, "success");
-      // Mark sidebar done
       document.querySelector('.nav-item[data-tool="video"]')?.classList.add("done");
     } else {
       toast("Video processing gagal", "error");
