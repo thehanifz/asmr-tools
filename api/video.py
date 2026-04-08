@@ -61,27 +61,54 @@ def cmd_loop(input_path, output_path, duration, video_duration, keep_audio=False
 def cmd_loop_xfade(input_path, output_path, duration, video_duration,
                    xfade_duration=1.0, keep_audio=False):
     """
-    Buat loopable segment dengan xfade crossfade di seam-nya,
-    lalu loop ke durasi target dengan output kompatibel Windows player.
+    Buat satu segment loopable dengan crossfade di titik seam:
+
+      ┌───────────────────────────────────┬──────────┐
+      │  body  (0 → video_dur - xd)      │  tail xd │  ← klip A (trim)
+      └───────────────────────────────────┴──────────┘
+      ┌──────────┬────────────────────────────────────┐
+      │  head xd │  (dibuang)                        │  ← klip B (trim)
+      └──────────┴────────────────────────────────────┘
+
+    → concat(body_A, xfade(tail_A, head_B))
+    → loop segment ke durasi target
+
+    Hasilnya: titik akhir klip meleleh mulus ke awal klip berikutnya.
     """
-    xd = max(0.1, min(float(xfade_duration), max(video_duration * 0.4, 0.1)))
-    offset = max(0.0, video_duration - xd)
+    vd  = max(video_duration, 0.5)
+    xd  = max(0.1, min(float(xfade_duration), vd * 0.45))  # maks 45% durasi
+    body_end   = vd - xd        # detik akhir bagian body (= awal tail)
+    seg_dur    = vd - xd        # panjang segment hasil = body + 1 xfade region
+    # Durasi loopable segment = video_dur - xd
+    # Ketika loop, awal setiap iterasi langsung tersambung ke akhir iterasi sebelumnya
+    # karena tail sudah di-blend ke head.
 
     output_dir = os.path.dirname(output_path) or os.path.dirname(input_path)
-    basename = os.path.splitext(os.path.basename(input_path))[0]
-    seg_path = os.path.join(output_dir, f"_tmp_xseg_{basename}.mp4")
+    basename   = os.path.splitext(os.path.basename(input_path))[0]
+    seg_path   = os.path.join(output_dir, f"_tmp_xseg_{basename}.mp4")
+
+    # Filter graph:
+    #   [0:v] trim body  : 0  → body_end,  setpts reset
+    #   [1:v] trim tail  : body_end → vd,  setpts reset  (= xd detik)
+    #   [2:v] trim head  : 0  → xd,        setpts reset  (= xd detik)
+    #   xfade [tail][head] offset=0 (keduanya sudah mulai dari PTS 0)
+    #   concat body + xfade_result
+    filter_str = (
+        f"[0:v]trim=start=0:end={body_end},setpts=PTS-STARTPTS,format=yuv420p[body];"
+        f"[1:v]trim=start={body_end}:end={vd},setpts=PTS-STARTPTS,format=yuv420p[tail];"
+        f"[2:v]trim=start=0:end={xd},setpts=PTS-STARTPTS,format=yuv420p[head];"
+        f"[tail][head]xfade=transition=fade:duration={xd}:offset=0,format=yuv420p[seam];"
+        f"[body][seam]concat=n=2:v=1:a=0,format=yuv420p[vout]"
+    )
 
     cmd_seg = [
         "ffmpeg", "-y",
-        "-i", input_path,
-        "-i", input_path,
-        "-filter_complex",
-        f"[0:v]format=yuv420p,setpts=PTS-STARTPTS[v0];"
-        f"[1:v]format=yuv420p,setpts=PTS-STARTPTS[v1];"
-        f"[v0][v1]xfade=transition=fade:duration={xd}:offset={offset},format=yuv420p[vout]",
+        "-i", input_path,   # [0]
+        "-i", input_path,   # [1]
+        "-i", input_path,   # [2]
+        "-filter_complex", filter_str,
         "-map", "[vout]",
         "-an",
-        "-r", "30",
         "-c:v", "libx264",
         "-profile:v", "high",
         "-level", "4.1",
@@ -92,7 +119,7 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
         seg_path,
     ]
 
-    loops = max(1, int(duration / max(video_duration, 0.1)) + 10)
+    loops = max(1, int(duration / max(seg_dur, 0.1)) + 10)
     cmd_final = [
         "ffmpeg", "-y",
         "-stream_loop", str(loops), "-i", seg_path,
@@ -102,9 +129,11 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
         output_path,
     ]
 
+    label_seg = f"\U0001f500 XFade seam (tail\u2192head fade {xd:.1f}s, body {body_end:.1f}s)"
+    label_fin = f"\U0001f501 Loop xfade \u2192 {fmt_duration(duration)}"
     return [
-        (cmd_seg,   f"🔀 XFade segment (fade {xd}s @ {offset:.1f}s)", seg_path),
-        (cmd_final, f"🔁 Loop xfade → {fmt_duration(duration)}", output_path),
+        (cmd_seg,   label_seg, seg_path),
+        (cmd_final, label_fin, output_path),
     ], seg_path
 
 
@@ -140,7 +169,7 @@ async def video_pipeline(request: Request):
     if do_crop:
         steps.append((
             cmd_crop(prev, cropped, crop_top, crop_bottom, crop_left, crop_right),
-            f"✂️ Crop ({crop_top}/{crop_bottom}/{crop_left}/{crop_right}px)",
+            f"\u2702\ufe0f Crop ({crop_top}/{crop_bottom}/{crop_left}/{crop_right}px)",
             cropped,
         ))
         prev = cropped
@@ -148,7 +177,7 @@ async def video_pipeline(request: Request):
     if do_upscale:
         steps.append((
             cmd_upscale(prev, upscaled, upscale_res, crf=crf),
-            f"⬆️ Upscale → {upscale_res.replace(':', '×')}",
+            f"\u2b06\ufe0f Upscale \u2192 {upscale_res.replace(':', '\u00d7')}",
             upscaled,
         ))
         prev = upscaled
@@ -163,7 +192,7 @@ async def video_pipeline(request: Request):
     else:
         steps.append((
             cmd_loop(prev, final_output, duration, video_dur, keep_audio),
-            f"🔁 Loop → {fmt_duration(duration)} {'(+ audio)' if keep_audio else '(no audio)'}",
+            f"\U0001f501 Loop \u2192 {fmt_duration(duration)} {'(+ audio)' if keep_audio else '(no audio)'}",
             final_output,
         ))
 
