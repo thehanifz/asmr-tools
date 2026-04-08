@@ -20,6 +20,17 @@ export function initVideo() {
     }
   }
 
+  // ── Helper: toggle .xfade-off class pada image duration controls ──
+  function syncImageDurationControls(enabled) {
+    const wrap = $("imageDurationControls");
+    if (!wrap) return;
+    if (enabled) {
+      wrap.classList.remove("xfade-off");
+    } else {
+      wrap.classList.add("xfade-off");
+    }
+  }
+
   // ── Browse ──────────────────────────────────
   $("videoBrowse").addEventListener("click", async () => {
     const path = await browseVideo();
@@ -39,6 +50,13 @@ export function initVideo() {
     AppState.videoKeepAudio = e.target.checked;
   });
 
+  // ── Image Duration toggle ────────────────────
+  $("videoImageDurationEnabled").addEventListener("change", e => {
+    syncImageDurationControls(e.target.checked);
+  });
+  // Init: wrapper dimmed karena checkbox default off
+  syncImageDurationControls(false);
+
   // ── XFade toggle ────────────────────────────
   $("videoXfadeEnabled").addEventListener("change", e => {
     syncXfadeControls(e.target.checked);
@@ -54,6 +72,8 @@ export function initVideo() {
     const output        = $("videoOutput").value || buildOutputPath(input, "._processed", ".mp4");
     const xfadeEnabled  = $("videoXfadeEnabled").checked;
     const xfadeDuration = parseFloat($("videoXfadeDuration").value) || 1.0;
+    const imageDurationEnabled = $("videoImageDurationEnabled").checked;
+    const imageDuration = parseFloat($("videoImageDuration").value) || 5;
 
     const payload = {
       input,
@@ -68,6 +88,8 @@ export function initVideo() {
       keep_audio:     AppState.videoKeepAudio,
       xfade_enabled:  xfadeEnabled,
       xfade_duration: xfadeDuration,
+      image_duration_enabled: imageDurationEnabled,
+      image_duration: imageDuration,
     };
 
     $("videoProcess").disabled = true;

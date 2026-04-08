@@ -120,6 +120,42 @@
           </div>
         </div>
 
+        <!-- ── Image Duration Settings ── -->
+        <div class="section-divider"></div>
+
+        <div class="field-group">
+          <label class="field-label">Durasi per Gambar</label>
+          <p class="field-hint">Atur berapa lama setiap gambar ditampilkan saat membuat video dari gambar.</p>
+
+          <div class="checkbox-row" style="margin-bottom:12px;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="videoImageDurationEnabled">
+              <span class="checkmark"></span>
+              Aktifkan durasi gambar kustom
+            </label>
+          </div>
+
+          <!-- Input selalu di DOM, dikontrol via .xfade-off class (pointer-events:none) -->
+          <div class="controls-grid xfade-field xfade-off" id="imageDurationControls" style="grid-template-columns:1fr;" title="Centang checkbox di atas untuk mengaktifkan">
+            <div class="field-group" style="margin-bottom:0;">
+              <label class="field-label" for="videoImageDuration">
+                Durasi per Gambar
+                <span class="field-hint" style="display:inline;margin-left:4px;">detik</span>
+              </label>
+              <input
+                type="number"
+                id="videoImageDuration"
+                class="input"
+                value="5"
+                min="0.1"
+                step="0.5"
+              >
+              <p class="field-hint" style="margin-top:4px;">Rekomendasi: 3 – 10 detik per gambar</p>
+            </div>
+          </div>
+        </div>
+        <!-- ── End Image Duration ── -->
+
         <!-- ── Xfade Loop Settings ── -->
         <div class="section-divider"></div>
 
