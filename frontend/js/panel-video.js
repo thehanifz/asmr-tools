@@ -29,6 +29,12 @@ export function initVideo() {
     AppState.videoKeepAudio = e.target.checked;
   });
 
+  // ── Xfade toggle: tampilkan/sembunyikan field detik ──
+  $("videoXfadeEnabled").addEventListener("change", e => {
+    const wrap = $("xfadeDurationWrap");
+    if (wrap) wrap.style.display = e.target.checked ? "" : "none";
+  });
+
   // ── Process ─────────────────────────────────
   $("videoProcess").addEventListener("click", async () => {
     const input = $("videoInput").value;
@@ -36,17 +42,22 @@ export function initVideo() {
 
     const output = $("videoOutput").value || buildOutputPath(input, "._processed", ".mp4");
 
+    const xfadeEnabled  = $("videoXfadeEnabled").checked;
+    const xfadeDuration = parseFloat($("videoXfadeDuration").value) || 1.0;
+
     const payload = {
       input,
       output,
-      crop_top:      parseInt($("cropTop").value)    || 0,
-      crop_bottom:   parseInt($("cropBottom").value)  || 0,
-      crop_left:     parseInt($("cropLeft").value)    || 0,
-      crop_right:    parseInt($("cropRight").value)   || 0,
-      upscale:       $("upscaleRes").value,
-      duration:      parseInt($("videoDuration").value) || 3600,
+      crop_top:       parseInt($("cropTop").value)    || 0,
+      crop_bottom:    parseInt($("cropBottom").value)  || 0,
+      crop_left:      parseInt($("cropLeft").value)    || 0,
+      crop_right:     parseInt($("cropRight").value)   || 0,
+      upscale:        $("upscaleRes").value,
+      duration:       parseInt($("videoDuration").value) || 3600,
       video_duration: AppState.videoDuration,
-      keep_audio:    AppState.videoKeepAudio,
+      keep_audio:     AppState.videoKeepAudio,
+      xfade_enabled:  xfadeEnabled,
+      xfade_duration: xfadeDuration,
     };
 
     $("videoProcess").disabled = true;

@@ -1,4 +1,4 @@
-"""Video processing: crop (4-side), upscale, loop + optional keep audio."""
+"""Video processing: crop (4-side), upscale, loop + optional xfade loop."""
 import os
 import json
 import time
@@ -39,6 +39,7 @@ def cmd_upscale(input_path, output_path, resolution="1920:1080", algo="lanczos",
 
 
 def cmd_loop(input_path, output_path, duration, video_duration, keep_audio=False):
+    """Loop cepat pakai stream_copy (tanpa xfade)."""
     loops = max(1, int(duration / max(video_duration, 0.1)) + 10)
     cmd = [
         "ffmpeg", "-y",
@@ -51,6 +52,65 @@ def cmd_loop(input_path, output_path, duration, video_duration, keep_audio=False
         cmd += ["-an", "-c:v", "copy"]
     cmd.append(output_path)
     return cmd
+
+
+def cmd_loop_xfade(input_path, output_path, duration, video_duration,
+                   xfade_duration=1.0, keep_audio=False):
+    """
+    Buat loopable segment dengan xfade crossfade di seam-nya,
+    lalu stream_loop ke durasi target.
+
+    Cara kerja:
+      1. Buat satu segment dengan xfade di titik loop (offset = video_duration - xfade_duration)
+         menggunakan filter_complex. Hasil: file _tmp_xseg_*.mp4
+      2. Loop segment itu ke durasi target dengan stream_copy cepat.
+
+    Return list of (cmd, label, out_file) untuk dimasukkan ke pipeline steps.
+    """
+    xd = max(0.1, min(xfade_duration, video_duration * 0.4))  # clamp agar tidak melebihi 40% durasi klip
+    offset = max(0.0, video_duration - xd)
+
+    output_dir  = os.path.dirname(output_path) or os.path.dirname(input_path)
+    basename    = os.path.splitext(os.path.basename(input_path))[0]
+    seg_path    = os.path.join(output_dir, f"_tmp_xseg_{basename}.mp4")
+
+    # Step 1: buat segment xfade (membutuhkan 2 input: klip asli + klip asli)
+    # xfade menggabungkan ujung klip ke awal klip berikutnya.
+    # Karena kita ingin seamless loop, kita feed input 2x dan xfade di offset.
+    cmd_seg = [
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-i", input_path,
+        "-filter_complex",
+        f"[0:v][1:v]xfade=transition=fade:duration={xd}:offset={offset}[vout]",
+        "-map", "[vout]",
+        "-an",
+        "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+        seg_path,
+    ]
+
+    # Durasi segment hasil xfade = video_duration (ujung overlap sudah di-absorb)
+    seg_duration = video_duration
+
+    # Step 2: loop segment ke durasi target
+    loops = max(1, int(duration / max(seg_duration, 0.1)) + 10)
+    cmd_final = [
+        "ffmpeg", "-y",
+        "-stream_loop", str(loops), "-i", seg_path,
+        "-t", str(duration),
+    ]
+    if keep_audio:
+        # audio keep tidak relevan di xfade mode (audio sudah -an di step 1),
+        # tapi tetap kita sediakan opsi copy dari source segment jika ada
+        cmd_final += ["-c:v", "copy", "-an"]
+    else:
+        cmd_final += ["-an", "-c:v", "copy"]
+    cmd_final.append(output_path)
+
+    return [
+        (cmd_seg,   f"🔀 XFade segment (fade {xd}s @ {offset:.1f}s)", seg_path),
+        (cmd_final, f"🔁 Loop xfade → {fmt_duration(duration)}",       output_path),
+    ], seg_path  # seg_path perlu di-cleanup
 
 
 @router.post("/pipeline")
@@ -71,6 +131,10 @@ async def video_pipeline(request: Request):
     crf         = int(data.get("crf", 23))
     keep_audio  = bool(data.get("keep_audio", False))
 
+    # ── Xfade settings ──
+    xfade_enabled  = bool(data.get("xfade_enabled", False))
+    xfade_duration = float(data.get("xfade_duration", 1.0))
+
     do_crop    = any([crop_top, crop_bottom, crop_left, crop_right])
     do_upscale = bool(upscale_res)
 
@@ -90,11 +154,23 @@ async def video_pipeline(request: Request):
                       f"⬆️ Upscale → {upscale_res.replace(':', '×')}", upscaled))
         prev = upscaled
 
-    steps.append((cmd_loop(prev, final_output, duration, video_dur, keep_audio),
-                  f"🔁 Loop → {fmt_duration(duration)} {'(+ audio)' if keep_audio else '(no audio)'}",
-                  final_output))
-
+    # ── Pilih mode loop ──
     cleanup = []
+    xfade_seg_path = None
+
+    if xfade_enabled:
+        xfade_steps, xfade_seg_path = cmd_loop_xfade(
+            prev, final_output, duration, video_dur, xfade_duration, keep_audio
+        )
+        steps.extend(xfade_steps)
+        cleanup.append(xfade_seg_path)
+    else:
+        steps.append((
+            cmd_loop(prev, final_output, duration, video_dur, keep_audio),
+            f"🔁 Loop → {fmt_duration(duration)} {'(+ audio)' if keep_audio else '(no audio)'}",
+            final_output
+        ))
+
     if do_crop:    cleanup.append(cropped)
     if do_upscale: cleanup.append(upscaled)
 
