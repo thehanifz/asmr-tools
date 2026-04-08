@@ -8,14 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    .xfade-field.xfade-off {
-      opacity: 0.38;
-      pointer-events: none;
-      user-select: none;
-    }
-    .xfade-field {
-      transition: opacity 0.2s ease;
-    }
+    .ctrl-field { transition: opacity 0.2s ease; }
+    .ctrl-field.ctrl-off { opacity: 0.38; pointer-events: none; user-select: none; }
   </style>
 </head>
 <body>
@@ -29,7 +23,6 @@
       </svg>
       <span class="sidebar-logo-text">ASMR Tools</span>
     </div>
-
     <nav class="sidebar-nav">
       <button class="nav-item active" data-tool="video"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="16" height="16" rx="2"/><polygon points="22,4 22,20 16,12"/></svg><span>Video</span></button>
       <button class="nav-item" data-tool="extract"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg><span>Extract</span></button>
@@ -38,7 +31,6 @@
       <button class="nav-item" data-tool="merge"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>Merge</span></button>
       <button class="nav-item" data-tool="thumbnail"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg><span>Thumbnail</span></button>
     </nav>
-
     <div class="sidebar-workspace">
       <div class="workspace-label">Workspace</div>
       <div class="workspace-path" id="workspacePath">—</div>
@@ -51,8 +43,9 @@
         <h1 class="tool-title">Video Pipeline</h1>
         <span class="tool-badge">Crop → Upscale → Loop</span>
       </div>
-
       <div class="tool-body">
+
+        <!-- File input -->
         <div class="field-group">
           <label class="field-label">File Video</label>
           <div class="file-row">
@@ -62,6 +55,7 @@
           <div class="file-info" id="videoInfo"></div>
         </div>
 
+        <!-- Crop + Upscale -->
         <div class="controls-grid">
           <div class="field-group"><label class="field-label">Crop Atas (px)</label><input type="number" id="cropTop" class="input" value="0" min="0"></div>
           <div class="field-group"><label class="field-label">Crop Bawah (px)</label><input type="number" id="cropBottom" class="input" value="0" min="0"></div>
@@ -79,10 +73,49 @@
           <div class="field-group"><label class="field-label">Durasi Loop (detik)</label><input type="number" id="videoDuration" class="input" value="3600" min="1"></div>
         </div>
 
+        <!-- ── Fade In / Out ─────────────────────────────── -->
+        <div class="section-divider"></div>
+        <div class="field-group">
+          <label class="field-label">Fade In / Fade Out</label>
+          <p class="field-hint">Diterapkan pada output final — hitam ke video (fade in) dan video ke hitam (fade out).</p>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+            <!-- Fade In -->
+            <div>
+              <div class="checkbox-row" style="margin-bottom:8px;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="videoFadeInEnabled">
+                  <span class="checkmark"></span>
+                  Fade In
+                </label>
+              </div>
+              <div class="ctrl-field ctrl-off" id="fadeInControls">
+                <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
+                <input type="number" id="videoFadeInDuration" class="input" value="3" min="0.1" max="60" step="0.5">
+              </div>
+            </div>
+            <!-- Fade Out -->
+            <div>
+              <div class="checkbox-row" style="margin-bottom:8px;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="videoFadeOutEnabled">
+                  <span class="checkmark"></span>
+                  Fade Out
+                </label>
+              </div>
+              <div class="ctrl-field ctrl-off" id="fadeOutControls">
+                <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
+                <input type="number" id="videoFadeOutDuration" class="input" value="3" min="0.1" max="60" step="0.5">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── XFade Loop ─────────────────────────────────── -->
         <div class="section-divider"></div>
         <div class="field-group">
           <label class="field-label">Loop Transition (XFade)</label>
-          <p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa. Membutuhkan re-encode.</p>
+          <p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa. Diproses setelah Fade In/Out.</p>
           <div class="checkbox-row" style="margin-bottom:12px;">
             <label class="checkbox-label">
               <input type="checkbox" id="videoXfadeEnabled">
@@ -90,25 +123,23 @@
               Aktifkan XFade seamless loop
             </label>
           </div>
-          <div class="controls-grid xfade-field xfade-off" id="xfadeControls" style="grid-template-columns:1fr 1fr;" title="Centang checkbox di atas untuk mengaktifkan">
+          <div class="ctrl-field ctrl-off" id="xfadeControls" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label" for="videoXfadeDuration">Durasi XFade <span class="field-hint" style="display:inline;margin-left:4px;">detik</span></label>
+              <label class="field-label">Durasi XFade <span class="field-hint" style="display:inline;margin-left:4px;">detik</span></label>
               <input type="number" id="videoXfadeDuration" class="input" value="1.0" min="0.1" max="10" step="0.1">
               <p class="field-hint" style="margin-top:4px;">Rekomendasi ASMR: 0.5 – 1.5s</p>
             </div>
             <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label" for="videoXfadeType">Efek Transisi</label>
+              <label class="field-label">Efek Transisi</label>
               <select id="videoXfadeType" class="input">
                 <option value="fade" selected>Fade (smooth)</option>
-                <option value="dissolve">Dissolve (grain)</option>
-                <option value="wipeleft">Wipe Left</option>
-                <option value="wiperight">Wipe Right</option>
               </select>
-              <p class="field-hint" style="margin-top:4px;">⚠ Hanya <strong>Fade</strong> aktif saat ini.</p>
+              <p class="field-hint" style="margin-top:4px;">Membutuhkan re-encode penuh.</p>
             </div>
           </div>
         </div>
 
+        <!-- ── Opsi lain ──────────────────────────────────── -->
         <div class="section-divider"></div>
         <div class="checkbox-row">
           <label class="checkbox-label">
@@ -129,6 +160,7 @@
       </div>
     </section>
 
+    <!-- Extract Audio -->
     <section class="tool-panel hidden" id="tool-extract">
       <div class="tool-header"><h1 class="tool-title">Extract Audio</h1><span class="tool-badge">Video → MP3 / WAV / AAC / FLAC / OGG</span></div>
       <div class="tool-body">
@@ -141,6 +173,7 @@
       </div>
     </section>
 
+    <!-- Audio Loop -->
     <section class="tool-panel hidden" id="tool-audio">
       <div class="tool-header"><h1 class="tool-title">Audio Loop</h1><span class="tool-badge">Loop + Normalize + Fade</span></div>
       <div class="tool-body">
@@ -153,6 +186,7 @@
       </div>
     </section>
 
+    <!-- Denoise -->
     <section class="tool-panel hidden" id="tool-denoise">
       <div class="tool-header"><h1 class="tool-title">Denoise Audio</h1><span class="tool-badge">noisereduce · Python 3.12</span></div>
       <div class="tool-body">
@@ -165,6 +199,7 @@
       </div>
     </section>
 
+    <!-- Merge -->
     <section class="tool-panel hidden" id="tool-merge">
       <div class="tool-header"><h1 class="tool-title">Merge</h1><span class="tool-badge">Video + Multi Audio</span></div>
       <div class="tool-body">
@@ -177,6 +212,7 @@
       </div>
     </section>
 
+    <!-- Thumbnail -->
     <section class="tool-panel hidden" id="tool-thumbnail">
       <div class="tool-header"><h1 class="tool-title">Thumbnail</h1><span class="tool-badge">Extract Frame + Preview</span></div>
       <div class="tool-body">

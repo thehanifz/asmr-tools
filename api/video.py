@@ -1,4 +1,4 @@
-"""Video processing: crop (4-side), upscale, loop + optional xfade loop."""
+"""Video processing: crop (4-side), upscale, loop + optional xfade loop + fade in/out."""
 import os
 import math
 import json
@@ -9,7 +9,7 @@ from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str, safe_r
 
 router = APIRouter(prefix="/video", tags=["video"])
 
-MAX_XFADE_SEGMENTS = 120   # batas iterasi agar filter_complex tidak kehabisan memori
+MAX_XFADE_SEGMENTS = 120
 
 
 def cmd_crop(input_path, output_path, top=0, bottom=0, left=0, right=0):
@@ -61,53 +61,55 @@ def cmd_loop(input_path, output_path, duration, video_duration, keep_audio=False
     return cmd
 
 
+def cmd_fade_video(input_path, output_path, duration,
+                   fade_in=0.0, fade_out=0.0):
+    """
+    Terapkan fade in dan/atau fade out ke video.
+    fade_in  : detik dari awal
+    fade_out : detik dari akhir
+    duration : total durasi video (dibutuhkan untuk menghitung start fade out)
+    """
+    filters = []
+    if fade_in > 0:
+        filters.append(f"fade=t=in:st=0:d={fade_in}")
+    if fade_out > 0:
+        fo_start = max(0.0, duration - fade_out)
+        filters.append(f"fade=t=out:st={fo_start}:d={fade_out}")
+
+    vf = ",".join(filters) if filters else "copy"
+    return [
+        "ffmpeg", "-y", "-i", input_path,
+        "-vf", vf,
+        "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        "-an",
+        output_path,
+    ]
+
+
 def build_xfade_filter(n_clips, xd, vd):
-    """
-    Bangun filter_complex untuk N klip identik yang disambung
-    dengan xfade di setiap titik sambungan.
-
-    Setiap klip efektif berkontribusi (vd - xd) detik ke timeline,
-    kecuali klip terakhir yang berkontribusi penuh vd detik.
-
-    Offset xfade ke-i = i * (vd - xd)
-    """
     parts = []
-    # Label setiap input: [0:v] s/d [n-1:v], format dulu
     for i in range(n_clips):
         parts.append(f"[{i}:v]setpts=PTS-STARTPTS,format=yuv420p[c{i}]")
-
-    # Chain xfade: c0 xfade c1 -> xf0, xf0 xfade c2 -> xf1, dst.
     step = vd - xd
     prev = "c0"
     for i in range(1, n_clips):
         offset = round(i * step, 6)
-        out    = f"xf{i}" if i < n_clips - 1 else "vout"
+        out = f"xf{i}" if i < n_clips - 1 else "vout"
         parts.append(
             f"[{prev}][c{i}]xfade=transition=fade:duration={xd}:offset={offset}[{out}]"
         )
         prev = out
-
     return ";".join(parts)
 
 
 def cmd_loop_xfade(input_path, output_path, duration, video_duration,
                    xfade_duration=1.0):
-    """
-    Buat output berdurasi `duration` detik dengan xfade di setiap
-    titik sambungan loop. Seluruh timeline dirender dalam satu
-    filter_complex — tidak ada stream_loop — sehingga tidak ada
-    lompatan PTS antar iterasi.
-
-    Strategi:
-      - Hitung jumlah iterasi (n) yang dibutuhkan.
-      - Jika n > MAX_XFADE_SEGMENTS, potong menjadi beberapa
-        “block” dan concat block-block tersebut.
-    """
     vd = max(float(video_duration), 0.5)
     xd = max(0.1, min(float(xfade_duration), vd * 0.45))
-    step = vd - xd   # setiap klip menyumbang sebanyak ini ke timeline
-
-    n_total = math.ceil(duration / step) + 1  # klip terakhir untuk menutup sisa
+    step = vd - xd
+    n_total = math.ceil(duration / step) + 1
     n_total = max(2, n_total)
 
     output_dir = os.path.dirname(output_path) or os.path.dirname(input_path)
@@ -124,7 +126,6 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
     ]
 
     if n_total <= MAX_XFADE_SEGMENTS:
-        # ── Single pass ──────────────────────────────────────
         fc = build_xfade_filter(n_total, xd, vd)
         cmd = (
             ["ffmpeg", "-y"]
@@ -138,26 +139,17 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
         )
         label = f"\U0001f500 XFade full render ({n_total} iter, fade {xd:.1f}s)"
         return [(cmd, label, output_path)], []
-
     else:
-        # ── Multi-block pass ─────────────────────────────────
-        # Bagi n_total ke blok-blok MAX_XFADE_SEGMENTS klip.
-        # Setiap blok menghasilkan file sementara, lalu di-concat.
-        blocks    = []
         block_paths = []
         start_clip  = 0
         block_idx   = 0
         steps_list  = []
-
         while start_clip < n_total:
-            end_clip   = min(start_clip + MAX_XFADE_SEGMENTS, n_total)
-            n_block    = end_clip - start_clip
-            blk_path   = os.path.join(output_dir, f"_tmp_xblk{block_idx}_{basename}.mp4")
+            end_clip = min(start_clip + MAX_XFADE_SEGMENTS, n_total)
+            n_block  = end_clip - start_clip
+            blk_path = os.path.join(output_dir, f"_tmp_xblk{block_idx}_{basename}.mp4")
             block_paths.append(blk_path)
-
-            # Hitung ulang offset relatif dalam blok ini
             fc_block = build_xfade_filter(n_block, xd, vd)
-
             cmd_blk = (
                 ["ffmpeg", "-y"]
                 + ["-i", input_path] * n_block
@@ -167,31 +159,24 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
                 + enc_flags
                 + [blk_path]
             )
-            lbl = f"\U0001f500 XFade block {block_idx+1} ({n_block} iter)"
-            steps_list.append((cmd_blk, lbl, blk_path))
-
+            steps_list.append((cmd_blk, f"\U0001f500 XFade block {block_idx+1} ({n_block} iter)", blk_path))
             start_clip += n_block
             block_idx  += 1
 
-        # concat semua blok
         concat_list = os.path.join(output_dir, f"_tmp_xconcat_{basename}.txt")
         with open(concat_list, "w") as f:
             for bp in block_paths:
                 f.write(f"file '{bp}'\n")
-
         cmd_concat = [
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0",
             "-i", concat_list,
             "-t", str(duration),
-            "-an",
-            "-c:v", "copy",
+            "-an", "-c:v", "copy",
             output_path,
         ]
         steps_list.append((cmd_concat, "\U0001f4ce Concat blocks", output_path))
-
-        cleanup = block_paths + [concat_list]
-        return steps_list, cleanup
+        return steps_list, block_paths + [concat_list]
 
 
 @router.post("/pipeline")
@@ -211,19 +196,31 @@ async def video_pipeline(request: Request):
     video_dur   = float(data.get("video_duration", 8))
     crf         = int(data.get("crf", 23))
     keep_audio  = bool(data.get("keep_audio", False))
+
     xfade_enabled  = bool(data.get("xfade_enabled", False))
     xfade_duration = float(data.get("xfade_duration", 1.0))
 
+    fade_in_enabled  = bool(data.get("fade_in_enabled", False))
+    fade_out_enabled = bool(data.get("fade_out_enabled", False))
+    fade_in_dur      = float(data.get("fade_in_duration", 3.0))
+    fade_out_dur     = float(data.get("fade_out_duration", 3.0))
+
     do_crop    = any([crop_top, crop_bottom, crop_left, crop_right])
     do_upscale = bool(upscale_res)
+    do_fade    = fade_in_enabled or fade_out_enabled
 
     cropped  = os.path.join(output_dir, f"_tmp_{basename}_crop.mp4")
     upscaled = os.path.join(output_dir, f"_tmp_{basename}_up.mp4")
+    # Fade diterapkan SEBELUM xfade (pada source klip pendek)
+    faded    = os.path.join(output_dir, f"_tmp_{basename}_fade.mp4")
+    # Output sementara loop (sebelum fade-in/out pada hasil final jika tidak xfade)
+    looped   = os.path.join(output_dir, f"_tmp_{basename}_loop.mp4")
 
     steps   = []
     cleanup = []
     prev    = input_path
 
+    # ── 1. Crop ───────────────────────────────────────────────
     if do_crop:
         steps.append((
             cmd_crop(prev, cropped, crop_top, crop_bottom, crop_left, crop_right),
@@ -233,6 +230,7 @@ async def video_pipeline(request: Request):
         cleanup.append(cropped)
         prev = cropped
 
+    # ── 2. Upscale ────────────────────────────────────────────
     if do_upscale:
         steps.append((
             cmd_upscale(prev, upscaled, upscale_res, crf=crf),
@@ -242,18 +240,57 @@ async def video_pipeline(request: Request):
         cleanup.append(upscaled)
         prev = upscaled
 
+    # ── 3. Loop (xfade atau biasa) ────────────────────────────
     if xfade_enabled:
+        # Jika fade aktif: terapkan fade ke source klip pendek dulu,
+        # lalu xfade loop dari klip yang sudah di-fade.
+        # Ini menjamin fade in di awal total video & fade out di akhir.
+        # Untuk xfade mode, fade diterapkan ke output akhir (setelah loop)
+        # agar fade in/out hanya terjadi sekali di awal & akhir keseluruhan.
+        xfade_out = final_output if not do_fade else looped
+        if do_fade:
+            cleanup.append(looped)
+
         xfade_steps, xfade_cleanup = cmd_loop_xfade(
-            prev, final_output, duration, video_dur, xfade_duration
+            prev, xfade_out, duration, video_dur, xfade_duration
         )
         steps.extend(xfade_steps)
         cleanup.extend(xfade_cleanup)
+
+        if do_fade:
+            fi = fade_in_dur  if fade_in_enabled  else 0.0
+            fo = fade_out_dur if fade_out_enabled else 0.0
+            label_parts = []
+            if fi > 0: label_parts.append(f"fade-in {fi}s")
+            if fo > 0: label_parts.append(f"fade-out {fo}s")
+            steps.append((
+                cmd_fade_video(looped, final_output, duration, fi, fo),
+                f"\U0001f31f Fade video: {' + '.join(label_parts)}",
+                final_output,
+            ))
     else:
+        # Loop biasa: kalau fade aktif, loop dulu ke tmp, lalu fade
+        loop_out = final_output if not do_fade else looped
+        if do_fade:
+            cleanup.append(looped)
+
         steps.append((
-            cmd_loop(prev, final_output, duration, video_dur, keep_audio),
+            cmd_loop(prev, loop_out, duration, video_dur, keep_audio),
             f"\U0001f501 Loop \u2192 {fmt_duration(duration)} {'(+ audio)' if keep_audio else '(no audio)'}",
-            final_output,
+            loop_out,
         ))
+
+        if do_fade:
+            fi = fade_in_dur  if fade_in_enabled  else 0.0
+            fo = fade_out_dur if fade_out_enabled else 0.0
+            label_parts = []
+            if fi > 0: label_parts.append(f"fade-in {fi}s")
+            if fo > 0: label_parts.append(f"fade-out {fo}s")
+            steps.append((
+                cmd_fade_video(looped, final_output, duration, fi, fo),
+                f"\U0001f31f Fade video: {' + '.join(label_parts)}",
+                final_output,
+            ))
 
     async def run():
         total_start = time.time()
