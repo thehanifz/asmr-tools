@@ -8,15 +8,16 @@ import { toast, showFileInfo, consumeSSE }         from './ui.js';
 export function initVideo() {
   const $ = id => document.getElementById(id);
 
-  // ── Helper: sync state enable/disable input xfade ──
-  function syncXfadeInputs(enabled) {
-    const dur  = $("videoXfadeDuration");
-    const type = $("videoXfadeType");
-    if (!dur || !type) return;
-    dur.disabled  = !enabled;
-    type.disabled = !enabled;
-    dur.style.opacity  = enabled ? "1" : "0.4";
-    type.style.opacity = enabled ? "1" : "0.4";
+  // ── Helper: toggle .xfade-off class pada wrapper container ──
+  // Tidak menyentuh .disabled sama sekali — hanya class CSS.
+  function syncXfadeControls(enabled) {
+    const wrap = $("xfadeControls");
+    if (!wrap) return;
+    if (enabled) {
+      wrap.classList.remove("xfade-off");
+    } else {
+      wrap.classList.add("xfade-off");
+    }
   }
 
   // ── Browse ──────────────────────────────────
@@ -38,30 +39,29 @@ export function initVideo() {
     AppState.videoKeepAudio = e.target.checked;
   });
 
-  // ── XFade toggle: enable/disable field input detik & tipe ──
+  // ── XFade toggle ────────────────────────────
   $("videoXfadeEnabled").addEventListener("change", e => {
-    syncXfadeInputs(e.target.checked);
+    syncXfadeControls(e.target.checked);
   });
-  // Inisialisasi state awal (checkbox off → input disabled)
-  syncXfadeInputs(false);
+  // Init: wrapper dimmed karena checkbox default off
+  syncXfadeControls(false);
 
   // ── Process ─────────────────────────────────
   $("videoProcess").addEventListener("click", async () => {
     const input = $("videoInput").value;
     if (!input) { toast("Pilih file video dulu", "error"); return; }
 
-    const output = $("videoOutput").value || buildOutputPath(input, "._processed", ".mp4");
-
+    const output        = $("videoOutput").value || buildOutputPath(input, "._processed", ".mp4");
     const xfadeEnabled  = $("videoXfadeEnabled").checked;
     const xfadeDuration = parseFloat($("videoXfadeDuration").value) || 1.0;
 
     const payload = {
       input,
       output,
-      crop_top:       parseInt($("cropTop").value)    || 0,
-      crop_bottom:    parseInt($("cropBottom").value)  || 0,
-      crop_left:      parseInt($("cropLeft").value)    || 0,
-      crop_right:     parseInt($("cropRight").value)   || 0,
+      crop_top:       parseInt($("cropTop").value)      || 0,
+      crop_bottom:    parseInt($("cropBottom").value)    || 0,
+      crop_left:      parseInt($("cropLeft").value)      || 0,
+      crop_right:     parseInt($("cropRight").value)     || 0,
       upscale:        $("upscaleRes").value,
       duration:       parseInt($("videoDuration").value) || 3600,
       video_duration: AppState.videoDuration,
