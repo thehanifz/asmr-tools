@@ -73,35 +73,24 @@
           <div class="field-group"><label class="field-label">Durasi Loop (detik)</label><input type="number" id="videoDuration" class="input" value="3600" min="1"></div>
         </div>
 
-        <!-- ── Fade In / Out ─────────────────────────────── -->
+        <!-- Fade In / Out -->
         <div class="section-divider"></div>
         <div class="field-group">
           <label class="field-label">Fade In / Fade Out</label>
           <p class="field-hint">Diterapkan pada output final — hitam ke video (fade in) dan video ke hitam (fade out).</p>
-
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
-            <!-- Fade In -->
             <div>
               <div class="checkbox-row" style="margin-bottom:8px;">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="videoFadeInEnabled">
-                  <span class="checkmark"></span>
-                  Fade In
-                </label>
+                <label class="checkbox-label"><input type="checkbox" id="videoFadeInEnabled"><span class="checkmark"></span>Fade In</label>
               </div>
               <div class="ctrl-field ctrl-off" id="fadeInControls">
                 <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
                 <input type="number" id="videoFadeInDuration" class="input" value="3" min="0.1" max="60" step="0.5">
               </div>
             </div>
-            <!-- Fade Out -->
             <div>
               <div class="checkbox-row" style="margin-bottom:8px;">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="videoFadeOutEnabled">
-                  <span class="checkmark"></span>
-                  Fade Out
-                </label>
+                <label class="checkbox-label"><input type="checkbox" id="videoFadeOutEnabled"><span class="checkmark"></span>Fade Out</label>
               </div>
               <div class="ctrl-field ctrl-off" id="fadeOutControls">
                 <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
@@ -111,17 +100,13 @@
           </div>
         </div>
 
-        <!-- ── XFade Loop ─────────────────────────────────── -->
+        <!-- XFade Loop -->
         <div class="section-divider"></div>
         <div class="field-group">
           <label class="field-label">Loop Transition (XFade)</label>
-          <p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa. Diproses setelah Fade In/Out.</p>
+          <p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa.</p>
           <div class="checkbox-row" style="margin-bottom:12px;">
-            <label class="checkbox-label">
-              <input type="checkbox" id="videoXfadeEnabled">
-              <span class="checkmark"></span>
-              Aktifkan XFade seamless loop
-            </label>
+            <label class="checkbox-label"><input type="checkbox" id="videoXfadeEnabled"><span class="checkmark"></span>Aktifkan XFade seamless loop</label>
           </div>
           <div class="ctrl-field ctrl-off" id="xfadeControls" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="field-group" style="margin-bottom:0;">
@@ -131,29 +116,21 @@
             </div>
             <div class="field-group" style="margin-bottom:0;">
               <label class="field-label">Efek Transisi</label>
-              <select id="videoXfadeType" class="input">
-                <option value="fade" selected>Fade (smooth)</option>
-              </select>
+              <select id="videoXfadeType" class="input"><option value="fade" selected>Fade (smooth)</option></select>
               <p class="field-hint" style="margin-top:4px;">Membutuhkan re-encode penuh.</p>
             </div>
           </div>
         </div>
 
-        <!-- ── Opsi lain ──────────────────────────────────── -->
+        <!-- Opsi lain -->
         <div class="section-divider"></div>
         <div class="checkbox-row">
-          <label class="checkbox-label">
-            <input type="checkbox" id="videoKeepAudio">
-            <span class="checkmark"></span>
-            Pertahankan suara original video
-          </label>
+          <label class="checkbox-label"><input type="checkbox" id="videoKeepAudio"><span class="checkmark"></span>Pertahankan suara original video</label>
         </div>
-
         <div class="field-group">
           <label class="field-label">Output</label>
           <input type="text" id="videoOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
         </div>
-
         <button class="btn btn-primary btn-full" id="videoProcess">▶ Proses Video</button>
         <div class="progress-wrap" id="videoProgressWrap"><div class="progress-bar"><div class="progress-fill" id="videoProgressFill"></div></div><div class="progress-label" id="videoProgressLabel"></div></div>
         <div class="log-box" id="videoLog"></div>
@@ -175,12 +152,64 @@
 
     <!-- Audio Loop -->
     <section class="tool-panel hidden" id="tool-audio">
-      <div class="tool-header"><h1 class="tool-title">Audio Loop</h1><span class="tool-badge">Loop + Normalize + Fade</span></div>
+      <div class="tool-header"><h1 class="tool-title">Audio Loop</h1><span class="tool-badge">Loop + XFade Seamless</span></div>
       <div class="tool-body">
-        <div class="field-group"><label class="field-label">File Audio</label><div class="file-row"><input type="text" id="audioInput" class="file-input" placeholder="Pilih file audio..." readonly><button class="btn btn-secondary" id="audioBrowse">Browse</button></div><div class="file-info" id="audioInfo"></div></div>
-        <div class="controls-grid"><div class="field-group"><label class="field-label">Durasi (detik)</label><input type="number" id="audioDuration" class="input" value="3600" min="1"></div><div class="field-group"><label class="field-label">Target LUFS</label><input type="number" id="audioLufs" class="input" value="-14" step="0.5"></div><div class="field-group"><label class="field-label">Fade In (detik)</label><input type="number" id="audioFadeIn" class="input" value="3" min="0" step="0.5"></div><div class="field-group"><label class="field-label">Fade Out (detik)</label><input type="number" id="audioFadeOut" class="input" value="5" min="0" step="0.5"></div></div>
-        <div class="field-group"><label class="field-label">Output</label><input type="text" id="audioOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly></div>
-        <button class="btn btn-primary btn-full" id="audioProcess">▶ Proses Audio</button>
+
+        <!-- File input -->
+        <div class="field-group">
+          <label class="field-label">File Audio</label>
+          <div class="file-row">
+            <input type="text" id="audioInput" class="file-input" placeholder="Pilih file audio..." readonly>
+            <button class="btn btn-secondary" id="audioBrowse">Browse</button>
+          </div>
+          <div class="file-info" id="audioInfo"></div>
+        </div>
+
+        <!-- Durasi + Format -->
+        <div class="controls-grid">
+          <div class="field-group">
+            <label class="field-label">Durasi Loop <span class="field-hint" id="audioDurationLabel"></span></label>
+            <input type="number" id="audioDuration" class="input" value="3600" min="1">
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=3600;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">1 Jam</button>
+              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=10800;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">3 Jam</button>
+              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=28800;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">8 Jam</button>
+              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=36000;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">10 Jam</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Format Output</label>
+            <select id="audioFormat" class="input">
+              <option value="mp3">MP3 — VBR Best (q:a 0)</option>
+              <option value="aac" selected>AAC — 320k, YouTube ready</option>
+              <option value="flac">FLAC — Lossless 24-bit</option>
+              <option value="wav">WAV — PCM 24-bit</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- XFade -->
+        <div class="section-divider"></div>
+        <div class="field-group">
+          <label class="field-label">Crossfade di Titik Loop (XFade)</label>
+          <p class="field-hint">Sambungan loop di-blend agar tidak terdengar putus. Gunakan 0.5–3 detik untuk ASMR.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+            <div class="field-group" style="margin-bottom:0;">
+              <label class="field-label" style="font-size:0.78rem;">Durasi XFade <span style="opacity:.6">detik</span></label>
+              <input type="number" id="audioXfade" class="input" value="2.0" min="0.1" max="10" step="0.1">
+              <p class="field-hint" style="margin-top:4px;">Range: 0.1 – 5 dtk</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Output -->
+        <div class="section-divider"></div>
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="audioOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="audioProcess">▶ Proses Audio Loop</button>
         <div class="progress-wrap" id="audioProgressWrap"><div class="progress-bar"><div class="progress-fill" id="audioProgressFill"></div></div><div class="progress-label" id="audioProgressLabel"></div></div>
         <div class="log-box" id="audioLog"></div>
       </div>
