@@ -23,18 +23,18 @@ class ExtractAudioRequest(BaseModel):
     workspace: str = ""
 
 
-@router.post("/api/extract-audio")
+# FIX: hapus prefix /api/ — server.py sudah include_router dengan prefix='/api'
+# sehingga route ini terdaftar sebagai /api/extract-audio (bukan /api/api/extract-audio)
+@router.post("/extract-audio")
 async def extract_audio(req: ExtractAudioRequest):
     input_path = Path(req.input_path.strip())
 
     fmt = req.format.lower() if req.format.lower() in FORMAT_EXT else "mp3"
 
-    # --- Tentukan output path ---
+    # Tentukan output path
     if req.output_path.strip():
         output_path = Path(req.output_path.strip())
-        # BUG A FIX: Paksa ekstensi sesuai format yang dipilih.
-        # Kasus umum: user pilih format WAV tapi output_path masih .mp3
-        # karena autoFillOutputs() selalu generate _audio.mp3.
+        # Paksa ekstensi sesuai format yang dipilih
         if output_path.suffix.lstrip(".").lower() != fmt:
             output_path = output_path.with_suffix(f".{fmt}")
     else:
@@ -45,10 +45,6 @@ async def extract_audio(req: ExtractAudioRequest):
 
     codec_args = FORMAT_EXT[fmt]
 
-    # BUG B FIX: Tambah -stats_period 0.5 agar FFmpeg kirim progress
-    # ke stderr setiap 0.5 detik (default FFmpeg hanya update sekali di akhir
-    # untuk audio-only job pendek, sehingga UI terlihat bisu).
-    # -nostdin mencegah FFmpeg menunggu stdin yang tidak ada di server context.
     cmd = [
         "ffmpeg", "-y",
         "-nostdin",
@@ -57,11 +53,10 @@ async def extract_audio(req: ExtractAudioRequest):
     ] + codec_args + [str(output_path)]
 
     return StreamingResponse(
-        run_ffmpeg_stream(cmd, label=f"Extract Audio → {fmt.upper()} → {output_path.name}"),
+        run_ffmpeg_stream(cmd, label=f"Extract Audio \u2192 {fmt.upper()} \u2192 {output_path.name}"),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "X-Output-Path": str(output_path),   # info tambahan untuk debugging
         },
     )
