@@ -19,9 +19,15 @@ function updateDurationLabel() {
   const sec = parseInt(val('audioDuration', '3600')) || 0;
   const h   = Math.floor(sec / 3600);
   const m   = Math.floor((sec % 3600) / 60);
-  const lbl = h > 0
-    ? `= ${h} jam${m > 0 ? ' ' + m + ' mnt' : ''}`
-    : `= ${m} menit`;
+  const s   = sec % 60;
+  let lbl;
+  if (h > 0) {
+    lbl = `= ${h} jam${m > 0 ? ' ' + m + ' mnt' : ''}`;
+  } else if (m > 0) {
+    lbl = `= ${m} menit${s > 0 ? ' ' + s + ' dtk' : ''}`;
+  } else {
+    lbl = `= ${s} detik`;
+  }
   const el = $('audioDurationLabel');
   if (el) el.textContent = lbl;
 }
@@ -77,7 +83,7 @@ export function initAudio() {
   // Auto-fill dari denoise saat tab dibuka
   document.querySelector('.nav-item[data-tool="audio"]')
     ?.addEventListener('click', () => {
-      if (AppState.audioDenoisedPath && !val('audioInput')) {
+      if (AppState.audioDenoisedPath) {
         $('audioInput').value = AppState.audioDenoisedPath;
         syncOutputExt();
       }
@@ -99,7 +105,7 @@ export function initAudio() {
       btn.disabled    = true;
       btn.textContent = '⏳ Memproses...';
 
-      const { ok } = await consumeSSE(
+      const { ok, finalData } = await consumeSSE(
         '/api/audio/loop',
         { input, output, duration: dur, format: fmt, xfade },
         'audioLog',
@@ -112,8 +118,10 @@ export function initAudio() {
       btn.textContent = '▶ Proses Audio Loop';
 
       if (ok) {
-        AppState.audioLoopedPath = output;
-        toast('✓ Audio loop selesai', 'success');
+        // Pakai output path dari backend (bisa beda ekstensi dari frontend)
+        const finalPath = finalData?.output || output;
+        AppState.audioLoopedPath = finalPath;
+        toast(`✓ Audio loop selesai · ${finalData?.size || ''}`, 'success');
         document.querySelector('.nav-item[data-tool="audio"]')?.classList.add('done');
       } else {
         toast('Audio processing gagal — cek log', 'error');

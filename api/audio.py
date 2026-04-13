@@ -33,7 +33,7 @@ async def get_audio_duration(input_path: str) -> float:
 
 
 async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
-    """Generator: loop audio dengan acrossfade per concat segment."""
+    """Generator: loop audio seamless ke durasi target."""
     import json, time
     from api.utils import now_ts, fmt_elapsed
 
@@ -49,20 +49,15 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
         yield f"data: {json.dumps({'status': 'error', 'code': -1, 'log': 'Gagal baca durasi file input'})}\n\n"
         return
 
+    # Validasi duration
+    if duration <= 0:
+        yield f"data: {json.dumps({'status': 'error', 'code': -2, 'log': 'Durasi target harus lebih dari 0'})}\n\n"
+        return
+
     yield f"data: {json.dumps({'log': f'Durasi sumber: {src_dur:.2f}s, target: {duration}s, xfade: {xfade}s', 'ts': now_ts(), 'elapsed': 0})}\n\n"
 
-    import math
-    # Hitung berapa loop yang dibutuhkan
-    # Tiap sambungan memakan xfade detik, jadi efektif per segment = src_dur - xfade
-    effective = max(src_dur - xfade, 0.1)
-    n_loops = math.ceil(duration / effective) + 2  # +2 buffer
-
-    yield f"data: {json.dumps({'log': f'Membuat {n_loops} segmen loop...', 'ts': now_ts(), 'elapsed': round(time.time()-start,1)})}\n\n"
-
-    # Build filter_complex dengan acrossfade per sambungan
-    # [0:a] → split n_loops copy → acrossfade berantai
-    if n_loops <= 1:
-        # Tidak perlu loop, langsung trim
+    # Jika source sudah lebih panjang dari target, langsung trim tanpa loop
+    if src_dur >= duration:
         filter_str = f"atrim=duration={duration},asetpts=PTS-STARTPTS"
         cmd = [
             "ffmpeg", "-y", "-nostdin",
@@ -72,19 +67,15 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
             output_path,
         ]
     else:
-        # Gunakan stream_loop + acrossfade approach
-        # Lebih reliable daripada filter_complex panjang
+        # Loop dengan crossfade di akhir
         xfade_safe = min(xfade, src_dur * 0.45)  # max 45% dari durasi sumber
-        total_needed = duration + xfade_safe * 2
 
+        # Filter: infinite loop → trim ke durasi target + fade out → fade out di akhir
         filter_str = (
             f"aloop=loop=-1:size=2147483647,"
-            f"atrim=duration={total_needed:.3f},"
-            f"asetpts=PTS-STARTPTS,"
-            f"afade=t=out:st={duration:.3f}:d={xfade_safe:.3f}:curve=tri,"
-            f"afade=t=in:st=0:d={xfade_safe:.3f}:curve=tri,"
             f"atrim=duration={duration:.3f},"
-            f"asetpts=PTS-STARTPTS"
+            f"asetpts=PTS-STARTPTS,"
+            f"afade=t=out:st={duration - xfade_safe:.3f}:d={xfade_safe:.3f}:curve=tri"
         )
 
         cmd = [
@@ -92,7 +83,6 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
             "-stream_loop", "-1",
             "-i", input_path,
             "-af", filter_str,
-            "-t", str(duration),
             *codec_args,
             output_path,
         ]
@@ -102,6 +92,12 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
     # Stream FFmpeg
     async for chunk in run_ffmpeg_stream(cmd, label=f"Audio Loop → {fmt.upper()} {duration//3600}h"):
         yield chunk
+
+    # Kirim final output path ke frontend
+    import os
+    if os.path.exists(output_path):
+        size_str = get_file_size_str(output_path)
+        yield f"data: {json.dumps({'status': 'done', 'output': output_path, 'size': size_str, 'ts': now_ts()})}\n\n"
 
 
 @router.post("/loop")
@@ -149,11 +145,16 @@ async def loop_audio(request: Request):
     if fmt not in CODEC_MAP:
         fmt = "aac"
 
-    # Override ekstensi output sesuai format
-    base = os.path.splitext(input_path)[0] + "._looped"
-    if output_path:
-        base = os.path.splitext(output_path)[0]
-    output_path = base + CODEC_MAP[fmt]["ext"]
+    # Tentukan output path:
+    # - Jika user tidak kasih output, pakai default dari input path
+    # - Jika user kasih output, ganti ekstensi sesuai format yang dipilih
+    if not output_path:
+        base = os.path.splitext(input_path)[0]
+        output_path = base + "._looped" + CODEC_MAP[fmt]["ext"]
+    else:
+        # Ganti ekstensi sesuai format, tapi tetap filename user
+        name_without_ext = os.path.splitext(output_path)[0]
+        output_path = name_without_ext + CODEC_MAP[fmt]["ext"]
 
     output_dir = os.path.dirname(os.path.abspath(output_path))
     try:
