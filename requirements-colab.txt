@@ -1,0 +1,13 @@
+# Dependencies tambahan untuk Google Colab environment
+# Install dengan: pip install -r requirements-colab.txt
+
+# Google Drive & Auth
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+
+# Video processing tambahan
+scikit-video
+
+# Sudah tersedia di Colab runtime (tidak perlu install ulang):
+# torch, torchvision, numpy, opencv-python, ffmpeg
