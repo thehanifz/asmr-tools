@@ -39,7 +39,7 @@ function syncOutputExt() {
 // ── Init ──────────────────────────────────
 export function initAudio() {
 
-  // Guard: pastikan semua elemen ada
+  // Pastikan semua elemen ada
   const IDS = ['audioBrowse','audioProcess','audioDuration',
                'audioFormat','audioXfade','audioInput','audioOutput'];
   for (const id of IDS) {
