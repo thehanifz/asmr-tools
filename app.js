@@ -1,4 +1,4 @@
-// ── STATE ────────────────────────────────────────────────────────
+// ── STATE ────────────────────────────────────────────────────────────────
 let fileInfo = {};
 let lastOutputFolder = '';
 let pipelineState = { original: '', lastOutput: '', chain: [] };
@@ -8,7 +8,7 @@ let _timerInterval = null;
 let _stepStartTime = null;
 let _totalStartTime = null;
 
-// ── DRAG & DROP ──────────────────────────────────────────────────
+// ── DRAG & DROP ───────────────────────────────────────────────────────
 const dropZone = document.getElementById('drop-zone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
@@ -24,32 +24,32 @@ dropZone.addEventListener('drop', e => {
     } else {
       pathInput.value = file.name;
       pathInput.style.borderColor = '#e94560';
-      setLog('⚠️ Drag & Drop hanya mendapat nama file. Gunakan tombol 📂 Browse.');
+      setLog('\u26A0\uFE0F Drag & Drop hanya mendapat nama file. Gunakan tombol \uD83D\uDCC2 Browse.');
     }
   }
 });
 
 function os_sep() { return navigator.platform.includes('Win') ? '\\' : '/'; }
 
-// ── BROWSE ──────────────────────────────────────────────────────
+// ── BROWSE ────────────────────────────────────────────────────────
 async function browseFile() {
   try {
     const res = await fetch('/api/browse');
     const data = await res.json();
-    if (data.error) return setLog('❌ Browse error: ' + data.error);
+    if (data.error) return setLog('\u274C Browse error: ' + data.error);
     if (data.path) {
       document.getElementById('file-path').value = data.path;
       document.getElementById('file-path').style.borderColor = '';
       probeVideo();
     }
-  } catch (err) { setLog('❌ Browse gagal: ' + err.message); }
+  } catch (err) { setLog('\u274C Browse gagal: ' + err.message); }
 }
 
 async function browseOutputFolder(targetId) {
   try {
     const res = await fetch('/api/browse-folder');
     const data = await res.json();
-    if (data.error) return setLog('❌ Browse folder error: ' + data.error);
+    if (data.error) return setLog('\u274C Browse folder error: ' + data.error);
     if (data.path && targetId) {
       const el = document.getElementById(targetId);
       if (el) {
@@ -65,24 +65,25 @@ async function browseOutputFolder(targetId) {
             'audio-output'     : `${sep}${base}_audio.mp4`,
             'thumb-output'     : `${sep}${base}_thumbnail.jpg`,
             'audio-custom-path': '',
+            'extract-output'   : `${sep}${base}_audio.mp3`,
           };
           el.value = data.path + (suffixMap[targetId] !== undefined ? suffixMap[targetId] : '');
         }
         lastOutputFolder = data.path;
       }
     }
-  } catch (err) { setLog('❌ Browse folder gagal: ' + err.message); }
+  } catch (err) { setLog('\u274C Browse folder gagal: ' + err.message); }
 }
 
-// ── PROBE VIDEO ──────────────────────────────────────────────────
+// ── PROBE VIDEO ──────────────────────────────────────────────────────
 async function probeVideo() {
   const path = document.getElementById('file-path').value.trim();
   if (!path) return alert('Masukkan path video dulu!');
-  setLog('⏳ Membaca info video...');
+  setLog('\u23F3 Membaca info video...');
   try {
     const res  = await fetch('/api/probe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({path}) });
     const data = await res.json();
-    if (data.error) return setLog('❌ ' + data.error);
+    if (data.error) return setLog('\u274C ' + data.error);
     fileInfo = { ...data, path };
     pipelineState = { original: path, lastOutput: path, chain: [] };
     updatePipelineIndicator();
@@ -93,8 +94,8 @@ async function probeVideo() {
     document.getElementById('info-size').textContent     = data.size_str;
     document.getElementById('file-info').classList.remove('hidden');
     autoFillOutputs(path);
-    setLog(`✅ File loaded: ${data.filename} (${data.resolution}, ${data.duration_str}, ${data.size_str})`);
-  } catch (err) { setLog('❌ Error: ' + err.message); }
+    setLog(`\u2705 File loaded: ${data.filename} (${data.resolution}, ${data.duration_str}, ${data.size_str})`);
+  } catch (err) { setLog('\u274C Error: ' + err.message); }
 }
 
 function autoFillOutputs(inputPath) {
@@ -109,10 +110,13 @@ function autoFillOutputs(inputPath) {
   document.getElementById('audio-output').value   = `${dir}${sep}${base}_audio.mp4`;
   document.getElementById('thumb-output').value   = `${dir}${sep}${base}_thumbnail.jpg`;
   document.getElementById('all-output-dir').value = dir;
+  // FIX #3: isi extract-input secara otomatis saat file di-load
+  const extractInput = document.getElementById('extract-input');
+  if (extractInput) extractInput.value = inputPath;
   lastOutputFolder = dir;
 }
 
-// ── PIPELINE STATE ────────────────────────────────────────────────
+// ── PIPELINE STATE ────────────────────────────────────────────────────
 function updatePipelineIndicator() {
   const el = document.getElementById('pipeline-indicator');
   if (!el) return;
@@ -120,7 +124,7 @@ function updatePipelineIndicator() {
   el.classList.remove('hidden');
   const fname = pipelineState.lastOutput.split('\\').pop().split('/').pop();
   const isOriginal = pipelineState.lastOutput === pipelineState.original;
-  el.innerHTML = `<span>🎯 Input aktif: <strong>${fname}</strong></span>
+  el.innerHTML = `<span>\uD83C\uDFAF Input aktif: <strong>${fname}</strong></span>
     ${!isOriginal ? `<button onclick="resetPipeline()">↩ Reset</button>` : ''}`;
 }
 
@@ -128,7 +132,7 @@ function resetPipeline() {
   pipelineState.lastOutput = pipelineState.original;
   pipelineState.chain = [];
   updatePipelineIndicator();
-  setLog('↩ Pipeline direset ke file original: ' + pipelineState.original);
+  setLog('\u21A9 Pipeline direset ke file original: ' + pipelineState.original);
 }
 
 function setLastOutput(outputPath, stepName) {
@@ -142,15 +146,7 @@ function setLastOutput(outputPath, stepName) {
   lastOutputFolder = dir;
 }
 
-// ── TABS ─────────────────────────────────────────────────────────
-function switchTab(name) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  event.target.classList.add('active');
-}
-
-// ── DURATION LABEL ─────────────────────────────────────────────
+// ── DURATION LABEL ───────────────────────────────────────────────
 document.getElementById('loop-duration').addEventListener('input', function() {
   const sec = parseInt(this.value) || 0;
   const h   = Math.floor(sec / 3600);
@@ -163,7 +159,7 @@ function setDuration(sec) {
   document.getElementById('loop-duration').dispatchEvent(new Event('input'));
 }
 
-// ── LOOP MODE TOGGLE ─────────────────────────────────────────────
+// ── LOOP MODE TOGGLE ───────────────────────────────────────────────────
 function updateLoopModeUI() {
   const mode = document.getElementById('loop-mode').value;
   const noiseRow    = document.getElementById('loop-noise-row');
@@ -174,12 +170,12 @@ function updateLoopModeUI() {
   if (crossfadeRow) crossfadeRow.classList.toggle('hidden', mode !== 'v2');
 }
 
-// ── AUDIO CUSTOM TOGGLE ──────────────────────────────────────────
+// ── AUDIO CUSTOM TOGGLE ────────────────────────────────────────────────
 document.getElementById('audio-noise').addEventListener('change', function() {
   document.getElementById('audio-custom-row').classList.toggle('hidden', this.value !== 'custom');
 });
 
-// ── LIVE TIMER HELPERS ──────────────────────────────────────────
+// ── LIVE TIMER HELPERS ──────────────────────────────────────────────────
 function fmtSec(s) {
   s = Math.floor(s);
   const h = Math.floor(s / 3600);
@@ -215,7 +211,7 @@ function resetTimers() {
   document.getElementById('timer-total').textContent = '0s';
 }
 
-// ── RUN SINGLE PROCESS ───────────────────────────────────────────
+// ── RUN SINGLE PROCESS ───────────────────────────────────────────────────
 async function runProcess(action) {
   if (!pipelineState.lastOutput && !fileInfo.path) return alert('Load video dulu!');
   const input = pipelineState.lastOutput || fileInfo.path;
@@ -266,7 +262,7 @@ async function runProcess(action) {
   });
 }
 
-// ── RUN ALL IN ONE ───────────────────────────────────────────────
+// ── RUN ALL IN ONE ─────────────────────────────────────────────────────────
 async function runProcessAll() {
   if (!fileInfo.path) return alert('Load video dulu!');
   const body = {
@@ -287,11 +283,11 @@ async function runProcessAll() {
   startStream('/api/process-all', body);
 }
 
-// ── SSE STREAM ───────────────────────────────────────────────────
+// ── SSE STREAM ───────────────────────────────────────────────────────────────
 function startStream(endpoint, body, onDoneCallback) {
   clearLog();
   resetTimers();
-  setProgress(0, '⏳ Memulai proses...');
+  setProgress(0, '\u23F3 Memulai proses...');
   document.getElementById('btn-open-folder').classList.add('hidden');
   document.getElementById('timer-box').classList.remove('hidden');
 
@@ -318,15 +314,14 @@ function startStream(endpoint, body, onDoneCallback) {
       });
     }
     read();
-  }).catch(err => { stopLiveTimer(); setLog('❌ ' + err.message); });
+  }).catch(err => { stopLiveTimer(); setLog('\u274C ' + err.message); });
 }
 
 function handleStreamData(d, onDoneCallback) {
-  // ── Pipeline start info ──
   if (d.type === 'pipeline_start') {
     _totalStartTime = Date.now();
     appendLog('='.repeat(52));
-    appendLog(`🚀 ALL-IN-ONE PIPELINE DIMULAI`);
+    appendLog(`\uD83D\uDE80 ALL-IN-ONE PIPELINE DIMULAI`);
     appendLog(`   Input   : ${d.input} (${d.input_size})`);
     appendLog(`   Target  : ${d.target} | Mode: ${d.loop_mode.toUpperCase()}`);
     appendLog(`   Total step: ${d.total_steps}`);
@@ -334,34 +329,30 @@ function handleStreamData(d, onDoneCallback) {
     return;
   }
 
-  // ── Step start ──
   if (d.type === 'step_start') {
     startLiveTimer();
     appendLog('');
-    appendLog(`▶️  [${d.step}/${d.total}] ${d.label}`);
+    appendLog(`\u25B6\uFE0F  [${d.step}/${d.total}] ${d.label}`);
     appendLog(`   CMD: ${d.cmd}`);
     setProgress(Math.round(((d.step - 1) / d.total) * 90), `Step ${d.step}/${d.total}: ${d.label}`);
     return;
   }
 
-  // ── Step done ──
   if (d.type === 'step_done') {
-    startLiveTimer(); // reset step timer ke step berikutnya
+    startLiveTimer();
     const pct = Math.round((d.step / d.total) * 90);
-    setProgress(pct, `✅ Step ${d.step}/${d.total} selesai`);
-    appendLog(`✅  Selesai dalam ${d.elapsed} | Output: ${d.output_file} (${d.output_size})`);
+    setProgress(pct, `\u2705 Step ${d.step}/${d.total} selesai`);
+    appendLog(`\u2705  Selesai dalam ${d.elapsed} | Output: ${d.output_file} (${d.output_size})`);
     return;
   }
 
-  // ── Step error ──
   if (d.type === 'step_error') {
     stopLiveTimer();
-    appendLog(`❌  ERROR di step ${d.step}: ${d.label} (${d.elapsed})`);
-    setProgress(0, `❌ Error di step ${d.step}`);
+    appendLog(`\u274C  ERROR di step ${d.step}: ${d.label} (${d.elapsed})`);
+    setProgress(0, `\u274C Error di step ${d.step}`);
     return;
   }
 
-  // ── FFmpeg log ──
   if (d.log) {
     appendLog('   ' + d.log);
     const match = d.log.match(/frame=\s*(\d+)/);
@@ -369,48 +360,45 @@ function handleStreamData(d, onDoneCallback) {
       const frame = parseInt(match[1]);
       const totalFrames = Math.round((fileInfo.duration || 8) * (fileInfo.fps || 24) * 450);
       const pct = Math.min(89, Math.round((frame / totalFrames) * 100));
-      setProgress(pct, `⏳ frame ${frame}`);
+      setProgress(pct, `\u23F3 frame ${frame}`);
     }
     if (d.log.includes('speed=')) {
       const m = d.log.match(/speed=(\S+)x/);
-      if (m) document.getElementById('progress-info').textContent += `  ⚡ ${m[1]}x`;
+      if (m) document.getElementById('progress-info').textContent += `  \u26A1 ${m[1]}x`;
     }
   }
 
-  // ── Loop-v2 step_done (endpoint /api/loop-v2) ──
   if (d.step_done) {
-    appendLog(`✅  Step ${d.step_done} selesai (${d.elapsed}) → ${d.output_file} (${d.output_size})`);
+    appendLog(`\u2705  Step ${d.step_done} selesai (${d.elapsed}) \u2192 ${d.output_file} (${d.output_size})`);
     startLiveTimer();
   }
 
-  // ── ALL DONE ──
   if (d.status === 'done' || d.status === 'all_done') {
     stopLiveTimer();
-    setProgress(100, `✅ Selesai!`);
+    setProgress(100, `\u2705 Selesai!`);
     document.getElementById('btn-open-folder').classList.remove('hidden');
     appendLog('');
     appendLog('='.repeat(52));
-    appendLog(`✅  PIPELINE SELESAI`);
-    if (d.total_elapsed) appendLog(`⏱️  Total waktu   : ${d.total_elapsed}`);
-    if (d.output)        appendLog(`📹  Output video  : ${d.output}`);
-    if (d.final_size)    appendLog(`💾  Ukuran output : ${d.final_size}`);
-    if (d.thumbnail)     appendLog(`🖼️  Thumbnail     : ${d.thumbnail} (${d.thumb_size || '?'})`);
+    appendLog(`\u2705  PIPELINE SELESAI`);
+    if (d.total_elapsed) appendLog(`\u23F1\uFE0F  Total waktu   : ${d.total_elapsed}`);
+    if (d.output)        appendLog(`\uD83D\uDCF9  Output video  : ${d.output}`);
+    if (d.final_size)    appendLog(`\uD83D\uDCBE  Ukuran output : ${d.final_size}`);
+    if (d.thumbnail)     appendLog(`\uD83D\uDDBC\uFE0F  Thumbnail     : ${d.thumbnail} (${d.thumb_size || '?'})`);
     if (d.tmp) {
-      appendLog(`🗂️  Temp files:`);
+      appendLog(`\uD83D\uDDC2\uFE0F  Temp files:`);
       Object.entries(d.tmp).forEach(([k, v]) => appendLog(`     ${k}: ${v}`));
     }
     appendLog('='.repeat(52));
     if (onDoneCallback) onDoneCallback();
   }
 
-  // ── Generic error ──
   if (d.status === 'error') {
     stopLiveTimer();
-    setProgress(0, '❌ Error! Lihat log di bawah.');
+    setProgress(0, '\u274C Error! Lihat log di bawah.');
   }
 }
 
-// ── OPEN FOLDER ──────────────────────────────────────────────────
+// ── OPEN FOLDER ───────────────────────────────────────────────────────────
 async function openFolder() {
   await fetch('/api/open-folder', {
     method: 'POST',
@@ -419,7 +407,7 @@ async function openFolder() {
   });
 }
 
-// ── LOG HELPERS ──────────────────────────────────────────────────
+// ── LOG HELPERS ───────────────────────────────────────────────────────────
 function setLog(msg) {
   const box = document.getElementById('log-box');
   box.textContent = msg;
