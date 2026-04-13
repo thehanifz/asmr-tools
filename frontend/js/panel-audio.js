@@ -76,14 +76,19 @@ export function initAudio() {
   // ── Process ─────────────────────────────────
   $('audioProcess').addEventListener('click', async () => {
     try {
+      console.log('[Audio Loop] Button clicked');
+      
       const input = $('audioInput').value.trim();
       if (!input) { toast('Pilih file audio dulu', 'error'); return; }
+      console.log('[Audio Loop] Input:', input);
 
       const fmt    = $('audioFormat').value;
       const ext    = FORMAT_EXT[fmt] || '.m4a';
       const output = $('audioOutput').value.trim() || buildOutputPath(input, '._looped', ext);
       const xfade  = parseFloat($('audioXfade').value) || 2.0;
       const dur    = parseInt($('audioDuration').value) || 3600;
+
+      console.log('[Audio Loop] Settings:', { fmt, output, xfade, dur });
 
       const payload = {
         input,
@@ -96,10 +101,14 @@ export function initAudio() {
       $('audioProcess').disabled = true;
       $('audioProcess').textContent = '⏳ Memproses...';
 
+      console.log('[Audio Loop] Calling API:', '/api/audio/loop', payload);
+
       const { ok, finalData } = await consumeSSE(
         '/api/audio/loop', payload,
         'audioLog', 'audioProgressWrap', 'audioProgressFill', 'audioProgressLabel'
       );
+
+      console.log('[Audio Loop] Response:', { ok, finalData });
 
       $('audioProcess').disabled = false;
       $('audioProcess').textContent = '▶ Proses Audio Loop';
@@ -112,7 +121,7 @@ export function initAudio() {
         toast('Audio processing gagal — cek log', 'error');
       }
     } catch (e) {
-      console.error('audioProcess error:', e);
+      console.error('[Audio Loop] Error:', e);
       $('audioProcess').disabled = false;
       $('audioProcess').textContent = '▶ Proses Audio Loop';
       toast(`Error: ${e.message}`, 'error');

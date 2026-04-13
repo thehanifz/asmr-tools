@@ -115,21 +115,55 @@ async def loop_audio(request: Request):
       xfade    : float — durasi crossfade detik (default 2.0)
       format   : str   — mp3 | aac | flac | wav (default aac)
     """
-    data        = await request.json()
-    input_path  = data["input"]
+    import json
+    
+    try:
+        data = await request.json()
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Invalid JSON payload: {str(e)}"}
+        )
+    
+    input_path  = data.get("input", "")
     output_path = data.get("output", "")
     duration    = int(data.get("duration", 3600))
     xfade       = float(data.get("xfade", 2.0))
     fmt         = data.get("format", "aac").lower()
 
+    if not input_path:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Input file path is required"}
+        )
+
+    if not os.path.exists(input_path):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Input file does not exist: {input_path}"}
+        )
+
     if fmt not in CODEC_MAP:
         fmt = "aac"
 
     # Override ekstensi output sesuai format
-    base = os.path.splitext(output_path)[0] if output_path else os.path.splitext(input_path)[0] + "._looped"
+    base = os.path.splitext(input_path)[0] + "._looped"
+    if output_path:
+        base = os.path.splitext(output_path)[0]
     output_path = base + CODEC_MAP[fmt]["ext"]
 
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    output_dir = os.path.dirname(os.path.abspath(output_path))
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Cannot create output directory: {str(e)}"}
+        )
 
     return StreamingResponse(
         stream_audio_loop(input_path, output_path, duration, xfade, fmt),
