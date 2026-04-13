@@ -20,7 +20,7 @@
         <circle cx="21" cy="14" r="1.5" fill="white"/>
       </svg>
       <span class="logo-text">ASMR Tools</span>
-      <span class="version-badge">v1.4</span>
+      <span class="version-badge">v1.5</span>
     </div>
 
     <nav class="sidebar-nav">
@@ -168,7 +168,6 @@
               <label class="field-label">File Video</label>
               <div class="input-group">
                 <input type="text" id="extract-input" placeholder="Otomatis dari file yang di-load..." />
-                <!-- FIX #4: pakai browseExtractInput() bukan browseOutputFolder() -->
                 <button class="btn-icon" onclick="browseExtractInput()" title="Browse file video">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 </button>
@@ -232,26 +231,92 @@
         <!-- AUDIO LOOP -->
         <div id="tab-audio" class="tab-panel">
           <div class="form-card">
-            <div class="card-header"><span class="card-title">Audio Loop</span><span class="card-desc">Loop + Normalize + Fade</span></div>
-            <div class="field"><label class="field-label">File Audio</label>
+            <div class="card-header">
+              <span class="card-title">Audio Loop</span>
+              <span class="card-desc">Loop seamless dengan crossfade di titik sambung</span>
+            </div>
+
+            <!-- File Input -->
+            <div class="field">
+              <label class="field-label">File Audio</label>
               <div class="input-group">
                 <input type="text" id="audio-file" placeholder="Pilih file audio..." />
-                <button class="btn-icon" onclick="browseOutputFolder('audio-file')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+                <button class="btn-icon" onclick="browseOutputFolder('audio-file')" title="Browse">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                </button>
               </div>
             </div>
-            <div class="form-grid">
-              <div class="field"><label class="field-label">Durasi (detik)</label><input type="number" id="audio-loop-duration" value="3600" /></div>
-              <div class="field"><label class="field-label">Target LUFS</label><input type="number" id="audio-lufs" value="-14" min="-30" max="0" /></div>
-              <div class="field"><label class="field-label">Fade In (detik)</label><input type="number" id="audio-fade-in" value="3" min="0" /></div>
-              <div class="field"><label class="field-label">Fade Out (detik)</label><input type="number" id="audio-fade-out" value="5" min="0" /></div>
+
+            <!-- Durasi -->
+            <div class="form-card" style="background:var(--color-surface-offset);border:none;margin-top:0">
+              <div class="card-header" style="padding-bottom:8px"><span class="card-title" style="font-size:var(--text-sm)">Durasi Target</span></div>
+              <div class="preset-group">
+                <button class="preset-btn" onclick="document.getElementById('audio-loop-duration').value=3600;updateAudioDurationLabel()">1 Jam</button>
+                <button class="preset-btn" onclick="document.getElementById('audio-loop-duration').value=10800;updateAudioDurationLabel()">3 Jam</button>
+                <button class="preset-btn" onclick="document.getElementById('audio-loop-duration').value=28800;updateAudioDurationLabel()">8 Jam</button>
+                <button class="preset-btn" onclick="document.getElementById('audio-loop-duration').value=36000;updateAudioDurationLabel()">10 Jam</button>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field-label">Durasi (detik)</label>
+                  <input type="number" id="audio-loop-duration" value="3600" min="60" oninput="updateAudioDurationLabel()" />
+                  <span class="field-hint" id="audio-duration-label">= 1 jam 0 menit</span>
+                </div>
+                <div class="field">
+                  <label class="field-label">Crossfade di sambungan (detik)</label>
+                  <input type="number" id="audio-xfade" value="1.0" step="0.1" min="0.1" max="5" />
+                  <span class="field-hint">Durasi blend antar loop (0.1 – 5 dtk)</span>
+                </div>
+              </div>
             </div>
-            <div class="field"><label class="field-label">Output</label>
+
+            <!-- Format Output -->
+            <div class="field" style="margin-top:12px">
+              <label class="field-label">Format Output</label>
+              <div class="format-grid">
+                <label class="format-option">
+                  <input type="radio" name="audio-loop-fmt" value="mp3" checked onchange="updateAudioOutputExt()" />
+                  <span class="format-label">
+                    <span class="format-name">MP3</span>
+                    <span class="format-desc">VBR best, kompatibel luas</span>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="audio-loop-fmt" value="aac" onchange="updateAudioOutputExt()" />
+                  <span class="format-label">
+                    <span class="format-name">AAC</span>
+                    <span class="format-desc">320 kbps, kualitas tinggi</span>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="audio-loop-fmt" value="flac" onchange="updateAudioOutputExt()" />
+                  <span class="format-label">
+                    <span class="format-name">FLAC</span>
+                    <span class="format-desc">Lossless, untuk mastering</span>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="audio-loop-fmt" value="wav" onchange="updateAudioOutputExt()" />
+                  <span class="format-label">
+                    <span class="format-name">WAV</span>
+                    <span class="format-desc">PCM 24-bit, tanpa kompresi</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Output Path -->
+            <div class="field">
+              <label class="field-label">Output File</label>
               <div class="input-group">
                 <input type="text" id="audio-output" placeholder="Otomatis dari workspace..." />
-                <button class="btn-icon" onclick="browseOutputFolder('audio-output')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+                <button class="btn-icon" onclick="browseOutputFolder('audio-output')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                </button>
               </div>
             </div>
-            <button class="btn-process" onclick="runProcess('audio-loop')">Proses Audio</button>
+
+            <button class="btn-process" onclick="runAudioLoop()">Loop Audio</button>
           </div>
         </div>
 
@@ -360,8 +425,8 @@
   </div><!-- /main-wrapper -->
 
   <script src="/static/app.js"></script>
+  <script src="/static/audio-loop.js"></script>
   <script>
-    // FIX #2: satu definisi switchTab — hapus versi lama di app.js yang pakai .tab-content/.tab
     function switchTab(name) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -375,6 +440,8 @@
         merge: 'Merge Audio', thumbnail: 'Thumbnail', all: 'All-in-One Pipeline'
       };
       document.getElementById('topbar-title').textContent = titles[name] || name;
+      // Init audio loop tab saat pertama dibuka
+      if (name === 'audio') initAudioLoopTab();
     }
 
     function addMergeItem() {
@@ -386,19 +453,15 @@
       list.appendChild(div);
     }
 
-    // FIX #4: browse file video (bukan folder) untuk field extract-input
     async function browseExtractInput() {
       try {
         const res = await fetch('/api/browse');
         const data = await res.json();
         if (data.error) return setLog('\u274C Browse error: ' + data.error);
-        if (data.path) {
-          document.getElementById('extract-input').value = data.path;
-        }
+        if (data.path) document.getElementById('extract-input').value = data.path;
       } catch (err) { setLog('\u274C Browse gagal: ' + err.message); }
     }
 
-    // FIX #1 + #3: SSE parser yang benar — bukan dump raw text + string '[DONE]'
     async function runExtractAudio() {
       const inputPath = document.getElementById('extract-input').value.trim()
                      || document.getElementById('file-path').value.trim();
@@ -440,49 +503,29 @@
             if (!line.startsWith('data: ')) return;
             try {
               const d = JSON.parse(line.slice(6));
-
               if (d.log) {
                 logBox.textContent += d.log + '\n';
                 logBox.scrollTop = logBox.scrollHeight;
-                const match = d.log.match(/frame=\s*(\d+)/);
-                if (match) {
-                  const frame = parseInt(match[1]);
-                  const totalFrames = Math.round((fileInfo.duration || 60) * (fileInfo.fps || 24));
-                  const pct = Math.min(90, Math.round((frame / Math.max(totalFrames, 1)) * 90));
-                  progressBar.style.width = pct + '%';
-                  progressInfo.textContent = '\u23F3 frame ' + frame;
-                }
               }
-
               if (d.status === 'done') {
                 stopLiveTimer();
                 progressBar.style.width = '100%';
                 progressInfo.textContent = '\u2705 Selesai! (' + (d.elapsed || 0) + 's)';
-                logBox.textContent += '\n\u2705 Extract audio selesai!';
-                logBox.scrollTop = logBox.scrollHeight;
                 document.getElementById('btn-open-folder').classList.remove('hidden');
-                // FIX #3: update lastOutputFolder agar btn-open-folder berfungsi
-                const finalOut = outputPath;
-                if (finalOut) {
+                if (outputPath) {
                   const sep = os_sep();
-                  lastOutputFolder = finalOut.includes(sep)
-                    ? finalOut.substring(0, finalOut.lastIndexOf(sep))
-                    : finalOut.substring(0, finalOut.lastIndexOf('/'));
+                  lastOutputFolder = outputPath.includes(sep)
+                    ? outputPath.substring(0, outputPath.lastIndexOf(sep))
+                    : outputPath.substring(0, outputPath.lastIndexOf('/'));
                 }
               }
-
               if (d.status === 'error') {
                 stopLiveTimer();
-                progressBar.style.width = '0%';
                 progressInfo.textContent = '\u274C Error! Lihat log.';
-                logBox.textContent += '\n\u274C FFmpeg gagal (exit code ' + d.code + ')';
-                logBox.scrollTop = logBox.scrollHeight;
               }
-
-            } catch(e) { /* skip malformed JSON */ }
+            } catch(e) {}
           });
         }
-
       } catch(e) {
         stopLiveTimer();
         logBox.textContent += '\n[ERROR] ' + e.message;
@@ -490,6 +533,5 @@
       }
     }
   </script>
-  <script src="/js/log-handler.js"></script>
 </body>
 </html>
