@@ -67,12 +67,11 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
             output_path,
         ]
     else:
-        # Loop dengan crossfade di akhir
-        xfade_safe = min(xfade, src_dur * 0.45)  # max 45% dari durasi sumber
+        # Loop dengan -stream_loop (streaming, tidak buffer ke RAM)
+        # Hindari aloop=size=2147483647 yang menyebabkan OOM pada file besar
+        xfade_safe = min(xfade, src_dur * 0.40)  # max 40% dari durasi sumber
 
-        # Filter: infinite loop → trim ke durasi target + fade out → fade out di akhir
         filter_str = (
-            f"aloop=loop=-1:size=2147483647,"
             f"atrim=duration={duration:.3f},"
             f"asetpts=PTS-STARTPTS,"
             f"afade=t=out:st={duration - xfade_safe:.3f}:d={xfade_safe:.3f}:curve=tri"
@@ -80,9 +79,9 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
 
         cmd = [
             "ffmpeg", "-y", "-nostdin",
-            "-stream_loop", "-1",
+            "-stream_loop", "-1",   # streaming loop — tidak ada buffering RAM
             "-i", input_path,
-            "-af", filter_str,
+            "-af", filter_str,      # tanpa aloop, cukup trim + fade
             *codec_args,
             output_path,
         ]
