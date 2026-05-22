@@ -2,8 +2,9 @@
 import os
 import asyncio
 from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from api.utils import run_ffmpeg_stream, get_file_size_str
+from core.env import get_thread_flags
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 
@@ -61,6 +62,7 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
         filter_str = f"atrim=duration={duration},asetpts=PTS-STARTPTS"
         cmd = [
             "ffmpeg", "-y", "-nostdin",
+            *get_thread_flags(),
             "-i", input_path,
             "-af", filter_str,
             *codec_args,
@@ -79,6 +81,7 @@ async def stream_audio_loop(input_path, output_path, duration, xfade, fmt):
 
         cmd = [
             "ffmpeg", "-y", "-nostdin",
+            *get_thread_flags(),
             "-stream_loop", "-1",   # streaming loop — tidak ada buffering RAM
             "-i", input_path,
             "-af", filter_str,      # tanpa aloop, cukup trim + fade

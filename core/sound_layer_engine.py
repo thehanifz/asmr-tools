@@ -942,6 +942,10 @@ class SoundLayerEngine:
         # Join all filter parts with semicolons
         filter_complex = ";".join(filter_parts)
         
+        # Add thread configuration (PO-01 & PO-02)
+        from core.env import get_thread_flags
+        cmd.extend(get_thread_flags())
+        
         # Add filter_complex to command
         cmd.extend(["-filter_complex", filter_complex])
         

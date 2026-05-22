@@ -5,6 +5,7 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str
+from core.env import get_thread_flags
 
 router = APIRouter(tags=["merge"])
 
@@ -38,7 +39,7 @@ async def merge_video_audio(request: Request):
     n = len(layers)
 
     # Build ffmpeg command
-    cmd = ["ffmpeg", "-y", "-i", video_path]
+    cmd = ["ffmpeg", "-y", *get_thread_flags(), "-i", video_path]
     for l in layers:
         cmd += ["-i", l["path"]]
 

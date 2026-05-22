@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, Request, HTTPException, Query
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from api.utils import run_ffmpeg_stream
+from core.env import get_thread_flags
 
 router = APIRouter(tags=["thumbnail"])
 
@@ -59,7 +60,7 @@ async def extract_thumbnail(request: Request):
         vf = "scale=iw:ih"
 
     cmd = [
-        "ffmpeg", "-y",
+        "ffmpeg", "-y", *get_thread_flags(),
         "-ss", str(time_sec), "-i", input_path,
         "-frames:v", "1",
         "-vf", vf,

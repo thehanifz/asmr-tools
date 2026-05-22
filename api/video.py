@@ -6,6 +6,7 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str, safe_remove_file
+from core.env import get_thread_flags
 
 router = APIRouter(prefix="/video", tags=["video"])
 
@@ -15,7 +16,7 @@ MAX_XFADE_SEGMENTS = 120
 def cmd_crop(input_path, output_path, top=0, bottom=0, left=0, right=0):
     vf = f"crop=in_w-{left}-{right}:in_h-{top}-{bottom}:{left}:{top}"
     return [
-        "ffmpeg", "-y", "-i", input_path,
+        "ffmpeg", "-y", *get_thread_flags(), "-i", input_path,
         "-vf", vf,
         "-c:v", "libx264", "-crf", "23", "-preset", "fast",
         "-pix_fmt", "yuv420p",
@@ -34,7 +35,7 @@ def _parse_res(res_str):
 def cmd_upscale(input_path, output_path, resolution="1920:1080", algo="lanczos", crf=23):
     w, h = _parse_res(resolution)
     return [
-        "ffmpeg", "-y", "-i", input_path,
+        "ffmpeg", "-y", *get_thread_flags(), "-i", input_path,
         "-vf", f"scale={w}:{h}:flags={algo}",
         "-c:v", "libx264", "-crf", str(crf), "-preset", "fast",
         "-pix_fmt", "yuv420p",
@@ -49,7 +50,7 @@ def cmd_loop(input_path, output_path, duration, video_duration, keep_audio=False
     """Loop cepat pakai stream_copy (tanpa xfade)."""
     loops = max(1, int(duration / max(video_duration, 0.1)) + 10)
     cmd = [
-        "ffmpeg", "-y",
+        "ffmpeg", "-y", *get_thread_flags(),
         "-stream_loop", str(loops), "-i", input_path,
         "-t", str(duration),
     ]
@@ -78,7 +79,7 @@ def cmd_fade_video(input_path, output_path, duration,
 
     vf = ",".join(filters) if filters else "copy"
     return [
-        "ffmpeg", "-y", "-i", input_path,
+        "ffmpeg", "-y", *get_thread_flags(), "-i", input_path,
         "-vf", vf,
         "-c:v", "libx264", "-crf", "23", "-preset", "fast",
         "-pix_fmt", "yuv420p",

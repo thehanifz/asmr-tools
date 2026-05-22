@@ -98,7 +98,17 @@ def video_encoder_flags(crf: int = 23, preset: str = "fast") -> list[str]:
             "-movflags", "+faststart",
         ]
 
-def audio_thread_flags() -> list[str]:
-    """Return FFmpeg threading flags untuk audio processing."""
-    # -threads 0 = auto-detect jumlah core, membantu operasi audio panjang
-    return ["-threads", "0"]
+def get_thread_flags() -> list[str]:
+    """Return FFmpeg threading flags untuk pemrosesan optimal."""
+    import multiprocessing
+    try:
+        logical_cpu = multiprocessing.cpu_count()
+    except Exception:
+        logical_cpu = 4
+    recommended_threads = str(min(8, logical_cpu))
+    
+    return [
+        "-threads", "0",
+        "-filter_threads", recommended_threads,
+        "-filter_complex_threads", recommended_threads
+    ]

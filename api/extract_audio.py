@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from api.utils import run_ffmpeg_stream
+from core.env import get_thread_flags
 
 router = APIRouter()
 
@@ -46,7 +47,7 @@ async def extract_audio(req: ExtractAudioRequest):
     codec_args = FORMAT_EXT[fmt]
 
     cmd = [
-        "ffmpeg", "-y",
+        "ffmpeg", "-y", *get_thread_flags(),
         "-nostdin",
         "-stats_period", "0.5",
         "-i", str(input_path),
