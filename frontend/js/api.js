@@ -69,3 +69,20 @@ export async function extractThumbnail(payload) {
 export function thumbnailPreviewUrl(path) {
   return `${BASE}/api/thumbnail/preview?path=${encodeURIComponent(path)}`;
 }
+
+// ── Sound Layer API ──────────────────────────────
+export async function browseFolderAudio() {
+  const res = await fetch(`${BASE}/api/sound-layer/browse-folder-audio`);
+  const data = await res.json();
+  return data;
+}
+
+export async function previewSoundLayer(payload) {
+  const res = await fetch(`${BASE}/api/sound-layer/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return await res.json();
+}
+

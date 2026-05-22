@@ -46,17 +46,59 @@ function updateMergeOutput() {
 export function initMerge() {
   const $ = id => document.getElementById(id);
 
+  const syncMergeAudioSource = () => {
+    const isLayer = $("mergeAudioSourceLayer").checked;
+    const btnAdd = $("addAudioLayer");
+    const layersDiv = $("audioLayers");
+
+    if (isLayer) {
+      btnAdd.style.display = "none";
+      layersDiv.innerHTML = "";
+      const path = AppState.soundLayerOutputPath || "";
+      const div = document.createElement("div");
+      div.className = "audio-layer read-only-layer";
+      div.innerHTML = `
+        <input type="text" class="file-input layer-path" placeholder="Hasil Render Sound Layering (menunggu render...)" readonly value="${path}">
+        <div class="audio-layer-vol">
+          <input type="number" class="layer-vol" value="100" min="0" max="200" step="5" readonly>
+          <span>%</span>
+        </div>
+      `;
+      layersDiv.appendChild(div);
+    } else {
+      btnAdd.style.display = "";
+      layersDiv.innerHTML = "";
+      if (AppState.audioLoopedPath) {
+        layersDiv.appendChild(createAudioLayer(AppState.audioLoopedPath, 100));
+      } else {
+        layersDiv.appendChild(createAudioLayer());
+      }
+    }
+  };
+
+  $("mergeAudioSourceManual").addEventListener("change", syncMergeAudioSource);
+  $("mergeAudioSourceLayer").addEventListener("change", syncMergeAudioSource);
+
   // Auto-fill when navigating to merge
   document.querySelector('.nav-item[data-tool="merge"]')?.addEventListener("click", () => {
     if (AppState.videoProcessedPath && !$("mergeVideo").value) {
       $("mergeVideo").value = AppState.videoProcessedPath;
       updateMergeOutput();
     }
-    // Add first audio layer from looped path if none exist
-    const layers = document.getElementById("audioLayers");
-    if (layers.children.length === 0 && AppState.audioLoopedPath) {
-      layers.appendChild(createAudioLayer(AppState.audioLoopedPath, 100));
-      updateMergeOutput();
+    
+    const isLayer = $("mergeAudioSourceLayer").checked;
+    if (isLayer) {
+      syncMergeAudioSource();
+    } else {
+      const layers = document.getElementById("audioLayers");
+      if (layers.children.length === 0) {
+        if (AppState.audioLoopedPath) {
+          layers.appendChild(createAudioLayer(AppState.audioLoopedPath, 100));
+        } else {
+          layers.appendChild(createAudioLayer());
+        }
+        updateMergeOutput();
+      }
     }
   });
 

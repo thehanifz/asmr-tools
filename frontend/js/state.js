@@ -24,6 +24,13 @@ export const AppState = {
   // Thumbnail
   thumbnailSourcePath: "",
   thumbnailOutputPath: "",
+
+  // Sound Layer
+  soundLayerMainPath: "",
+  soundLayerFolderPath: "",
+  soundLayerFiles: [],
+  soundLayerPlan: null,
+  soundLayerOutputPath: "",
 };
 
 // ── Path helpers ─────────────────────────────────

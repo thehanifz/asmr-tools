@@ -234,7 +234,7 @@ async def video_pipeline(request: Request):
     if do_upscale:
         steps.append((
             cmd_upscale(prev, upscaled, upscale_res, crf=crf),
-            f"\u2b06\ufe0f Upscale \u2192 {upscale_res.replace(':', '\u00d7')}",
+            f"\u2b06\ufe0f Upscale \u2192 {upscale_res.replace(':', '×')}",
             upscaled,
         ))
         cleanup.append(upscaled)

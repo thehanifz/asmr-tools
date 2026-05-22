@@ -503,3 +503,62 @@ option { background: var(--bg-card); }
 .toast.error::before { content: '✗'; color: var(--error); font-weight: 700; }
 .toast.info::before { content: 'ℹ'; color: var(--accent); }
 @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+
+/* ── SOUND LAYER POOL ───────────────────────────── */
+.pool-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pool-container.hidden {
+  display: none;
+}
+#soundLayerPoolList {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 4px;
+}
+#soundLayerPoolList::-webkit-scrollbar {
+  width: 4px;
+}
+#soundLayerPoolList::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 2px;
+}
+.pool-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid transparent;
+  transition: all var(--transition);
+}
+.pool-item:hover {
+  border-color: var(--border-accent);
+}
+.pool-item-name {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pool-item-dur {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
