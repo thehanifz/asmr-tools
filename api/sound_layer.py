@@ -87,7 +87,7 @@ async def preview_placement(request: Request):
         if not engine.optional_sound_files:
             return JSONResponse({"error": "None of the selected files are valid or exist in the folder"}, status_code=400)
             
-        plan = engine.generate_placement_plan()
+        plan = await engine.generate_placement_plan()
         return JSONResponse(json.loads(plan.to_json()))
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)

@@ -402,7 +402,7 @@ class SoundLayerEngine:
             print(f"Error detecting silence for {path}: {e}", file=sys.stderr)
             return (0.0, 0.0)
     
-    def detect_silence_cached(self, path: str) -> Tuple[float, float]:
+    async def detect_silence_cached(self, path: str) -> Tuple[float, float]:
         """
         Detect silence with caching to avoid redundant FFmpeg executions.
         
@@ -427,7 +427,6 @@ class SoundLayerEngine:
         Requirements: 8.4
         """
         import os
-        import asyncio
         
         # Validate file exists
         if not os.path.exists(path):
@@ -444,18 +443,8 @@ class SoundLayerEngine:
         if cache_key in self.silence_cache:
             return self.silence_cache[cache_key]
         
-        # Cache miss - detect silence
-        # Note: detect_silence is async, so we need to run it in an event loop
-        # For synchronous usage, we'll create a new event loop if needed
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # No event loop in current thread, create one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        # Run async detect_silence
-        result = loop.run_until_complete(self.detect_silence(path))
+        # Cache miss - await async detect_silence directly (no event loop needed)
+        result = await self.detect_silence(path)
         
         # Cache the result
         self.silence_cache[cache_key] = result
@@ -639,7 +628,7 @@ class SoundLayerEngine:
             # Linux: use single quotes and escape single quotes
             return f"'{path.replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'"
     
-    def generate_placement_plan(self) -> PlacementPlan:
+    async def generate_placement_plan(self) -> PlacementPlan:
         """
         Generate random placement plan based on configuration.
         
@@ -669,23 +658,14 @@ class SoundLayerEngine:
         Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10
         """
         import random
-        import asyncio
         import sys
         
         # Validate optional sound files are available
         if not self.optional_sound_files:
             raise ValueError("No optional sound files available. Call scan_optional_sounds() first.")
         
-        # Get main sound duration
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        self.main_duration = loop.run_until_complete(
-            self.get_audio_duration(self.config.main_sound)
-        )
+        # Get main sound duration using await (we are now async)
+        self.main_duration = await self.get_audio_duration(self.config.main_sound)
         
         if self.main_duration == 0:
             raise ValueError(f"Main sound duration is 0: {self.config.main_sound}")
@@ -738,7 +718,7 @@ class SoundLayerEngine:
                 
                 # Detect and cache silence
                 try:
-                    trimmed_start, trimmed_end = self.detect_silence_cached(source_file)
+                    trimmed_start, trimmed_end = await self.detect_silence_cached(source_file)
                 except Exception as e:
                     # If silence detection fails, skip this file and try another
                     print(
@@ -749,9 +729,7 @@ class SoundLayerEngine:
                 
                 # Get source file duration
                 try:
-                    source_duration = loop.run_until_complete(
-                        self.get_audio_duration(source_file)
-                    )
+                    source_duration = await self.get_audio_duration(source_file)
                 except Exception as e:
                     print(
                         f"Warning: Failed to get duration for {source_file}: {e}",
