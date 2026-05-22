@@ -29,7 +29,7 @@ async def browse_folder_audio():
             return {"path": "", "files": []}
         
         # Scan folder for audio files
-        config = LayerConfig(main_sound="", optional_sounds_folder=path, output_path="")
+        config = LayerConfig(main_sounds=[], optional_sounds_folder=path, output_path="")
         engine = SoundLayerEngine(config)
         files = engine.scan_optional_sounds()
         
@@ -52,12 +52,12 @@ async def browse_folder_audio():
 async def preview_placement(request: Request):
     try:
         data = await request.json()
-        main_sound = data.get("main_sound", "")
+        main_sounds = data.get("main_sounds", [])
         optional_sounds_folder = data.get("optional_sounds_folder", "")
         included_files = data.get("included_files", [])
         
-        if not main_sound:
-            return JSONResponse({"error": "Main sound is required"}, status_code=400)
+        if not main_sounds:
+            return JSONResponse({"error": "At least one main sound is required"}, status_code=400)
         if not optional_sounds_folder:
             return JSONResponse({"error": "Optional sounds folder is required"}, status_code=400)
         if not included_files:
@@ -65,9 +65,12 @@ async def preview_placement(request: Request):
 
         # Build config
         config = LayerConfig(
-            main_sound=main_sound,
+            main_sounds=main_sounds,
             optional_sounds_folder=optional_sounds_folder,
             output_path="",
+            target_duration=float(data.get("target_duration", 3600.0)),
+            loop_xfade=float(data.get("loop_xfade", 2.0)),
+            output_format=data.get("output_format", "aac"),
             occurrence_count=int(data.get("occurrence_count", 10)),
             time_window_start=float(data.get("time_window_start", 0.0)),
             time_window_end=float(data.get("time_window_end", 0.0)),
@@ -100,6 +103,10 @@ async def render_mix(request: Request):
         plan_data = data.get("plan")
         output_path = data.get("output_path", "")
         silence_threshold = float(data.get("silence_threshold", -50.0))
+        preview_mode = bool(data.get("preview_mode", False))
+        output_format = data.get("output_format", "aac").lower()
+        loop_xfade = float(data.get("loop_xfade", 2.0))
+        target_duration = float(data.get("target_duration", 3600.0))
         
         if not plan_data:
             return JSONResponse({"error": "Placement plan is required"}, status_code=400)
@@ -107,22 +114,29 @@ async def render_mix(request: Request):
         plan = PlacementPlan.from_json(json.dumps(plan_data))
         
         if not output_path:
-            base = os.path.splitext(plan.main_sound_path)[0]
-            output_path = base + "._layered.m4a"
+            base = os.path.splitext(plan.main_sounds[0]["path"])[0] if plan.main_sounds else "mix"
+            
+            if preview_mode:
+                output_path = os.path.join(os.path.dirname(base), "preview_mix_temp." + output_format)
+            else:
+                output_path = base + "._layered." + output_format
         else:
             name_without_ext = os.path.splitext(output_path)[0]
-            output_path = name_without_ext + ".m4a"
+            output_path = name_without_ext + "." + output_format
             
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         
         config = LayerConfig(
-            main_sound=plan.main_sound_path,
+            main_sounds=plan.main_sounds,
             optional_sounds_folder=plan.optional_sounds_folder,
             output_path=output_path,
+            target_duration=target_duration,
+            loop_xfade=loop_xfade,
+            output_format=output_format,
             silence_threshold=silence_threshold
         )
         engine = SoundLayerEngine(config)
-        cmd = engine.build_ffmpeg_command(plan)
+        cmd = engine.build_ffmpeg_command(plan, preview_mode=preview_mode)
         
         async def stream_render():
             import time

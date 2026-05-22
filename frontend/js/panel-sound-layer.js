@@ -46,19 +46,66 @@ export function initSoundLayer() {
   }
 
   // ── Browse Main Sound ─────────────────────────
-  $("soundLayerMainBrowse").addEventListener("click", async () => {
+  AppState.mainSounds = []; // Array of {path, volume}
+
+  function renderMainSoundsList() {
+    const list = $("soundLayerMainList");
+    if (!list) return;
+    list.innerHTML = "";
+    
+    $("soundLayerAddMainBtn").disabled = AppState.mainSounds.length >= 3;
+
+    AppState.mainSounds.forEach((snd, idx) => {
+      const div = document.createElement("div");
+      div.className = "file-row";
+      div.style.flexDirection = "column";
+      div.style.alignItems = "stretch";
+      div.style.gap = "8px";
+      div.style.padding = "10px";
+      div.style.background = "var(--bg-hover)";
+      div.style.borderRadius = "6px";
+      
+      div.innerHTML = `
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" class="file-input" value="${snd.path}" readonly style="flex:1;">
+          <button class="btn btn-ghost" style="color:var(--danger);" data-idx="${idx}">Hapus</button>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <label style="font-size:12px; min-width:50px;">Volume</label>
+          <input type="range" class="slider vol-slider" data-idx="${idx}" min="0" max="100" value="${snd.volume}" style="flex:1;">
+          <span style="font-family:var(--font-mono); font-size:12px; width:40px; text-align:right;">${snd.volume}%</span>
+        </div>
+      `;
+      
+      // Hapus event
+      div.querySelector(".btn-ghost").addEventListener("click", (e) => {
+        const i = parseInt(e.target.dataset.idx);
+        AppState.mainSounds.splice(i, 1);
+        renderMainSoundsList();
+      });
+      
+      // Volume event
+      const volSlider = div.querySelector(".vol-slider");
+      const volText = div.querySelector("span");
+      volSlider.addEventListener("input", (e) => {
+        const v = parseInt(e.target.value);
+        volText.textContent = v + "%";
+        AppState.mainSounds[parseInt(e.target.dataset.idx)].volume = v;
+      });
+
+      list.appendChild(div);
+    });
+  }
+
+  $("soundLayerAddMainBtn").addEventListener("click", async () => {
+    if (AppState.mainSounds.length >= 3) return;
     try {
       const path = await browseAudio();
       if (!path) return;
-      $("soundLayerMain").value = path;
       setWorkspace(path);
-      AppState.soundLayerMainPath = path;
-
-      const info = await probeFile(path);
-      if (info && !info.error) {
-        showFileInfo("soundLayerMainInfo", info);
-        AppState.soundLayerMainDuration = info.duration;
-      }
+      
+      AppState.mainSounds.push({ path: path, volume: 100 });
+      renderMainSoundsList();
     } catch (e) {
       console.error("[soundLayerMainBrowse]", e);
       toast("Gagal membuka file browser", "error");
@@ -89,11 +136,10 @@ export function initSoundLayer() {
     document.querySelectorAll("#soundLayerPoolList .pool-checkbox").forEach(cb => cb.checked = false);
   });
 
-  // ── Preview Placement ────────────────────────
-  $("soundLayerPreviewBtn").addEventListener("click", async () => {
-    const mainSound = $("soundLayerMain").value.trim();
+  // ── Preview Placement (Plan Layers) ────────────────────────
+  $("soundLayerPreviewPlanBtn").addEventListener("click", async () => {
     const folder = $("soundLayerFolder").value.trim();
-    if (!mainSound) { toast("Pilih main sound dulu", "error"); return; }
+    if (AppState.mainSounds.length === 0) { toast("Pilih minimal 1 main sound", "error"); return; }
     if (!folder) { toast("Pilih folder optional sound dulu", "error"); return; }
 
     const checkboxes = document.querySelectorAll("#soundLayerPoolList .pool-checkbox:checked");
@@ -111,16 +157,15 @@ export function initSoundLayer() {
     const minGap = parseFloat($("soundLayerMinGap").value) || 5;
     const allowOverlap = $("soundLayerAllowOverlap").checked;
     
-    // Window percent to seconds
-    const mainDuration = AppState.soundLayerMainDuration || 0;
-    if (!mainDuration) {
-      toast("Gagal mendapatkan durasi file utama. Coba pilih ulang file utama.", "error");
-      return;
-    }
+    // Target duration instead of mainDuration
+    const targetDuration = parseFloat($("soundLayerTargetDuration").value) || 3600;
+    const loopXfade = parseFloat($("soundLayerLoopXfade").value) || 2.0;
+    const outFormat = $("soundLayerOutputFormat").value || "aac";
+
     const winStartPct = parseFloat($("soundLayerWindowStart").value) || 0;
     const winEndPct = parseFloat($("soundLayerWindowEnd").value) || 100;
-    const timeWindowStart = (winStartPct / 100) * mainDuration;
-    const timeWindowEnd = (winEndPct / 100) * mainDuration;
+    const timeWindowStart = (winStartPct / 100) * targetDuration;
+    const timeWindowEnd = (winEndPct / 100) * targetDuration;
 
     const minDur = parseFloat($("soundLayerMinDur").value) || 3;
     const maxDur = parseFloat($("soundLayerMaxDur").value) || 15;
@@ -129,9 +174,12 @@ export function initSoundLayer() {
     const silenceThresh = parseFloat($("soundLayerSilenceThreshold").value) || -40;
 
     const payload = {
-      main_sound: mainSound,
+      main_sounds: AppState.mainSounds,
       optional_sounds_folder: folder,
       included_files: includedFiles,
+      target_duration: targetDuration,
+      loop_xfade: loopXfade,
+      output_format: outFormat,
       occurrence_count: occurrences,
       time_window_start: timeWindowStart,
       time_window_end: timeWindowEnd,
@@ -144,9 +192,9 @@ export function initSoundLayer() {
     };
 
     try {
-      $("soundLayerPreviewBtn").disabled = true;
+      $("soundLayerPreviewPlanBtn").disabled = true;
       const res = await previewSoundLayer(payload);
-      $("soundLayerPreviewBtn").disabled = false;
+      $("soundLayerPreviewPlanBtn").disabled = false;
 
       if (res.error) {
         toast("Gagal mempratinjau penempatan: " + res.error, "error");
@@ -174,33 +222,47 @@ export function initSoundLayer() {
       });
       toast("Rencana penempatan berhasil dibuat. Siap untuk render!", "success");
     } catch (e) {
-      $("soundLayerPreviewBtn").disabled = false;
+      $("soundLayerPreviewPlanBtn").disabled = false;
       logAppend("soundLayerLog", `✗ Error: ${e.message}`, "error");
       toast("Preview error: " + e.message, "error");
     }
   });
 
+  // ── Preview Mix (15s) ────────────────────────
+  $("soundLayerPreviewMixBtn").addEventListener("click", async () => {
+    doRender(true);
+  });
+
   // ── Render Mix ──────────────────────────────
   $("soundLayerRenderBtn").addEventListener("click", async () => {
+    doRender(false);
+  });
+
+  async function doRender(isPreviewMode) {
     if (!AppState.soundLayerPlan) {
-      toast("Silakan buat rencana penempatan dengan klik Preview Placement dahulu", "warning");
+      toast("Silakan buat rencana penempatan dengan klik 'Plan Layers' dahulu", "warning");
       return;
     }
 
-    const btn = $("soundLayerRenderBtn");
+    const btn = isPreviewMode ? $("soundLayerPreviewMixBtn") : $("soundLayerRenderBtn");
+    const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = "⏳ Rendering...";
 
     try {
       const silenceThresh = parseFloat($("soundLayerSilenceThreshold").value) || -40;
-      const mainSound = AppState.soundLayerPlan.main_sound_path;
-      const base = mainSound.substring(0, mainSound.lastIndexOf("."));
-      const outputSuggested = base + "._layered.m4a";
-
+      const outFormat = $("soundLayerOutputFormat").value || "aac";
+      const loopXfade = parseFloat($("soundLayerLoopXfade").value) || 2.0;
+      const targetDuration = parseFloat($("soundLayerTargetDuration").value) || 3600;
+      
       const payload = {
         plan: AppState.soundLayerPlan,
-        output_path: outputSuggested,
-        silence_threshold: silenceThresh
+        output_path: "", // Backend akan menentukan auto name
+        silence_threshold: silenceThresh,
+        preview_mode: isPreviewMode,
+        output_format: outFormat,
+        loop_xfade: loopXfade,
+        target_duration: targetDuration
       };
 
       const { ok, finalData } = await consumeSSE(
@@ -213,20 +275,26 @@ export function initSoundLayer() {
       );
 
       btn.disabled = false;
-      btn.textContent = "▶ Render Mix";
+      btn.textContent = originalText;
 
       if (ok && finalData) {
-        AppState.soundLayerOutputPath = finalData.output || outputSuggested;
+        AppState.soundLayerOutputPath = finalData.output;
         toast(`✓ Render selesai · ${finalData.size || ""}`, "success");
-        document.querySelector('.nav-item[data-tool="sound-layer"]')?.classList.add("done");
+        if (!isPreviewMode) {
+          document.querySelector('.nav-item[data-tool="sound-layer"]')?.classList.add("done");
+        }
 
         // Set up the player
         const playerContainer = $("soundLayerPlayerContainer");
         const audioPlayer = $("soundLayerAudioPlayer");
         if (playerContainer && audioPlayer) {
           playerContainer.style.display = "flex";
-          audioPlayer.src = `/api/sound-layer/play?path=${encodeURIComponent(AppState.soundLayerOutputPath)}`;
+          // Append timestamp to bypass browser cache for preview mix re-renders
+          audioPlayer.src = `/api/sound-layer/play?path=${encodeURIComponent(AppState.soundLayerOutputPath)}&t=${Date.now()}`;
           audioPlayer.load();
+          if (isPreviewMode) {
+            audioPlayer.play().catch(e => console.log("Auto-play blocked:", e));
+          }
         }
       } else {
         toast("Rendering gagal — cek log", "error");
@@ -234,8 +302,8 @@ export function initSoundLayer() {
     } catch (e) {
       console.error("[soundLayerRenderBtn]", e);
       btn.disabled = false;
-      btn.textContent = "▶ Render Mix";
+      btn.textContent = originalText;
       toast(`Error: ${e.message}`, "error");
     }
-  });
+  }
 }

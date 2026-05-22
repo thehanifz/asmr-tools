@@ -9,7 +9,7 @@ Feature: sound-layering-smart-merge
 """
 
 from dataclasses import dataclass, field, asdict
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any
 import json
 
 
@@ -48,9 +48,10 @@ class PlacementPlan:
         placements: List of Placement objects, sorted by start_time
     """
     version: str = "1.0"
-    main_sound_path: str = ""
+    main_sounds: List[Dict[str, Any]] = field(default_factory=list)
     optional_sounds_folder: str = ""
     placements: List[Placement] = field(default_factory=list)
+    target_duration: float = 3600.0
     
     def to_json(self) -> str:
         """
@@ -61,8 +62,9 @@ class PlacementPlan:
         """
         data = {
             "version": self.version,
-            "main_sound_path": self.main_sound_path,
+            "main_sounds": self.main_sounds,
             "optional_sounds_folder": self.optional_sounds_folder,
+            "target_duration": self.target_duration,
             "placements": [asdict(p) for p in self.placements]
         }
         return json.dumps(data, indent=2)
@@ -86,8 +88,9 @@ class PlacementPlan:
             placements = [Placement(**p) for p in data.get("placements", [])]
             return cls(
                 version=data.get("version", "1.0"),
-                main_sound_path=data.get("main_sound_path", ""),
+                main_sounds=data.get("main_sounds", []),
                 optional_sounds_folder=data.get("optional_sounds_folder", ""),
+                target_duration=data.get("target_duration", 3600.0),
                 placements=placements
             )
         except (json.JSONDecodeError, TypeError, KeyError) as e:
@@ -100,9 +103,12 @@ class LayerConfig:
     Configuration for sound layering operations.
     
     Attributes:
-        main_sound: Path to main audio file (base layer)
+        main_sounds: List of dicts with 'path' and 'volume' (0-100) for base layers
         optional_sounds_folder: Path to folder with optional sounds
         output_path: Output file path for rendered audio
+        target_duration: Total duration of the mix (seconds)
+        loop_xfade: Crossfade duration for looping main sounds (seconds)
+        output_format: Output format extension (e.g. "aac", "wav")
         occurrence_count: Number of optional sound placements
         time_window_start: Start of placement window (seconds)
         time_window_end: End of placement window (seconds, 0 = auto/full duration)
@@ -113,12 +119,15 @@ class LayerConfig:
         fade_duration: Fade in/out duration (seconds)
         silence_threshold: Silence detection threshold (dB)
     """
-    main_sound: str
+    main_sounds: List[Dict[str, Any]]
     optional_sounds_folder: str
     output_path: str
+    target_duration: float = 3600.0
+    loop_xfade: float = 2.0
+    output_format: str = "aac"
     occurrence_count: int = 10
     time_window_start: float = 0.0
-    time_window_end: float = 0.0  # 0 = auto (use main duration)
+    time_window_end: float = 0.0  # 0 = auto (use target duration)
     min_duration: float = 3.0
     max_duration: float = 10.0
     min_gap: float = 2.0
@@ -664,13 +673,13 @@ class SoundLayerEngine:
         if not self.optional_sound_files:
             raise ValueError("No optional sound files available. Call scan_optional_sounds() first.")
         
-        # Get main sound duration using await (we are now async)
-        self.main_duration = await self.get_audio_duration(self.config.main_sound)
+        # Get target duration directly from config
+        self.main_duration = self.config.target_duration
         
-        if self.main_duration == 0:
-            raise ValueError(f"Main sound duration is 0: {self.config.main_sound}")
+        if self.main_duration <= 0:
+            raise ValueError(f"Target duration must be > 0: {self.main_duration}")
         
-        # Determine time window end (use main_duration if not specified)
+        # Determine time window end (use target_duration if not specified)
         time_window_start = self.config.time_window_start
         time_window_end = self.config.time_window_end
         
@@ -815,7 +824,7 @@ class SoundLayerEngine:
         
         return plan
     
-    def build_ffmpeg_command(self, plan: PlacementPlan) -> list:
+    def build_ffmpeg_command(self, plan: PlacementPlan, preview_mode: bool = False) -> list:
         """
         Build FFmpeg command from placement plan.
         
@@ -868,12 +877,21 @@ class SoundLayerEngine:
         # Start building command
         cmd = ["ffmpeg", "-y"]
         
-        # Add main sound input
-        cmd.extend(["-i", plan.main_sound_path])
-        
+        # Apply preview mode constraint
+        target_dur = self.config.target_duration
+        if preview_mode:
+            target_dur = min(target_dur, 15.0)
+            
+        xfade = min(self.config.loop_xfade, target_dur * 0.4)
+            
+        # Add main sound inputs
+        # Loop main sounds endlessly, they will be trimmed by atrim
+        for main_sound in self.config.main_sounds:
+            cmd.extend(["-stream_loop", "-1", "-i", main_sound["path"]])
+            
         # Build map of unique source files to input indices
         unique_sources = {}
-        input_index = 1  # 0 is main sound
+        input_index = len(self.config.main_sounds)  # Start after main sounds
         
         for placement in plan.placements:
             if placement.source_file not in unique_sources:
@@ -881,10 +899,9 @@ class SoundLayerEngine:
                 cmd.extend(["-i", placement.source_file])
                 input_index += 1
         
-        # If no placements, just copy main sound
-        if not plan.placements:
-            cmd.extend(["-c:a", "aac", "-b:a", "256k", self.config.output_path])
-            return cmd
+        # If no main sounds provided, return early or error
+        if not self.config.main_sounds:
+            raise ValueError("No main sounds provided.")
         
         # Calculate max overlap count for volume normalization
         max_overlap_count = self._calculate_max_overlap_count(plan.placements)
@@ -933,11 +950,36 @@ class SoundLayerEngine:
             filter_parts.append(f"[{label}]adelay={delay_ms}|{delay_ms}[{delay_label}]")
             delayed_labels.append(delay_label)
         
-        # Build amix filter to combine main sound with all delayed optional sounds
-        amix_inputs = ["0:a"] + delayed_labels
+        main_labels = []
+        for i, ms in enumerate(self.config.main_sounds):
+            label = f"main{i}"
+            vol = ms.get("volume", 100) / 100.0
+            
+            # Trim to target duration, reset pts, apply fade out, apply volume
+            chain = (
+                f"[{i}:a]atrim=duration={target_dur:.3f},asetpts=PTS-STARTPTS,"
+                f"afade=t=out:st={target_dur - xfade:.3f}:d={xfade:.3f}"
+            )
+            if vol != 1.0:
+                chain += f",volume={vol}"
+            chain += f"[{label}]"
+            
+            filter_parts.append(chain)
+            main_labels.append(label)
+        
+        # Build amix filter to combine all main sounds with all delayed optional sounds
+        amix_inputs = main_labels + delayed_labels
         amix_filter = "".join([f"[{label}]" for label in amix_inputs])
-        amix_filter += f"amix=inputs={len(amix_inputs)}:duration=first:normalize=0[aout]"
-        filter_parts.append(amix_filter)
+        
+        if len(amix_inputs) > 1:
+            amix_filter += f"amix=inputs={len(amix_inputs)}:duration=first:normalize=0[aout]"
+            filter_parts.append(amix_filter)
+        else:
+            # Only one input, no need to mix, just rename label to [aout]
+            # Actually, we can just map it directly later if it's the only one, 
+            # but for simplicity we can use a dummy copy filter
+            amix_filter += "acopy[aout]"
+            filter_parts.append(amix_filter)
         
         # Join all filter parts with semicolons
         filter_complex = ";".join(filter_parts)
@@ -953,7 +995,12 @@ class SoundLayerEngine:
         cmd.extend(["-map", "[aout]"])
         
         # Add output codec arguments
-        cmd.extend(["-c:a", "aac", "-b:a", "256k"])
+        fmt = self.config.output_format.lower()
+        if fmt == "wav":
+            cmd.extend(["-c:a", "pcm_s24le"])
+        else:
+            # Default to AAC
+            cmd.extend(["-c:a", "aac", "-b:a", "256k"])
         
         # Add output path
         cmd.append(self.config.output_path)

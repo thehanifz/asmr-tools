@@ -151,87 +151,51 @@
       </div>
     </section>
 
-    <!-- Audio Loop -->
-    <section class="tool-panel hidden" id="tool-audio">
-      <div class="tool-header"><h1 class="tool-title">Audio Loop</h1><span class="tool-badge">Loop + XFade Seamless</span></div>
-      <div class="tool-body">
 
-        <!-- File input -->
-        <div class="field-group">
-          <label class="field-label">File Audio</label>
-          <div class="file-row">
-            <input type="text" id="audioInput" class="file-input" placeholder="Pilih file audio..." readonly>
-            <button class="btn btn-secondary" id="audioBrowse">Browse</button>
-          </div>
-          <div class="file-info" id="audioInfo"></div>
-        </div>
-
-        <!-- Durasi + Format -->
-        <div class="controls-grid">
-          <div class="field-group">
-            <label class="field-label">Durasi Loop <span class="field-hint" id="audioDurationLabel"></span></label>
-            <input type="number" id="audioDuration" class="input" value="3600" min="1">
-            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=3600;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">1 Jam</button>
-              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=10800;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">3 Jam</button>
-              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=28800;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">8 Jam</button>
-              <button class="btn btn-ghost" style="font-size:0.78rem;padding:4px 10px;" onclick="document.getElementById('audioDuration').value=36000;document.getElementById('audioDuration').dispatchEvent(new Event('input'))">10 Jam</button>
-            </div>
-          </div>
-          <div class="field-group">
-            <label class="field-label">Format Output</label>
-            <select id="audioFormat" class="input">
-              <option value="mp3">MP3 — VBR Best (q:a 0)</option>
-              <option value="aac" selected>AAC — 320k, YouTube ready</option>
-              <option value="flac">FLAC — Lossless 24-bit</option>
-              <option value="wav">WAV — PCM 24-bit</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- XFade -->
-        <div class="section-divider"></div>
-        <div class="field-group">
-          <label class="field-label">Crossfade di Titik Loop (XFade)</label>
-          <p class="field-hint">Sambungan loop di-blend agar tidak terdengar putus. Gunakan 0.5–3 detik untuk ASMR.</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
-            <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label" style="font-size:0.78rem;">Durasi XFade <span style="opacity:.6">detik</span></label>
-              <input type="number" id="audioXfade" class="input" value="2.0" min="0.1" max="10" step="0.1">
-              <p class="field-hint" style="margin-top:4px;">Range: 0.1 – 5 dtk</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Output -->
-        <div class="section-divider"></div>
-        <div class="field-group">
-          <label class="field-label">Output</label>
-          <input type="text" id="audioOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
-        </div>
-
-        <button class="btn btn-primary btn-full" id="audioProcess">▶ Proses Audio Loop</button>
-        <div class="progress-wrap" id="audioProgressWrap"><div class="progress-bar"><div class="progress-fill" id="audioProgressFill"></div></div><div class="progress-label" id="audioProgressLabel"></div></div>
-        <div class="log-box" id="audioLog"></div>
-      </div>
-    </section>
 
     <!-- Sound Layer -->
     <section class="tool-panel hidden" id="tool-sound-layer">
       <div class="tool-header">
-        <h1 class="tool-title">Sound Layer Editor</h1>
-        <span class="tool-badge">Smart Mix & Random Place</span>
+        <h1 class="tool-title">Audio Mix & Loop</h1>
+        <span class="tool-badge">Multiple Base Sounds + Layers</span>
       </div>
       <div class="tool-body">
         
         <!-- Main Sound Selection -->
         <div class="field-group">
-          <label class="field-label">Main Sound (Base Layer)</label>
-          <div class="file-row">
-            <input type="text" id="soundLayerMain" class="file-input" placeholder="Pilih audio utama (full durasi)..." readonly>
-            <button class="btn btn-secondary" id="soundLayerMainBrowse">Browse</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <label class="field-label" style="margin-bottom:0;">Main Sounds (Base Layer)</label>
+            <button class="btn btn-ghost btn-add" id="soundLayerAddMainBtn" style="font-size:12px; padding:2px 8px;">+ Tambah Audio Utama (Maks 3)</button>
           </div>
-          <div class="file-info" id="soundLayerMainInfo"></div>
+          <div id="soundLayerMainList" style="display:flex; flex-direction:column; gap:12px;">
+            <!-- Dinamis diisi lewat panel-sound-layer.js -->
+          </div>
+        </div>
+
+        <!-- Durasi + Format + XFade -->
+        <div class="section-divider"></div>
+        <div class="controls-grid">
+          <div class="field-group">
+            <label class="field-label">Target Durasi Output <span class="field-hint" id="soundLayerDurationLabel"></span></label>
+            <input type="number" id="soundLayerTargetDuration" class="input" value="3600" min="1">
+            <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;">
+              <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 8px;" onclick="document.getElementById('soundLayerTargetDuration').value=3600;document.getElementById('soundLayerTargetDuration').dispatchEvent(new Event('input'))">1 Jam</button>
+              <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 8px;" onclick="document.getElementById('soundLayerTargetDuration').value=10800;document.getElementById('soundLayerTargetDuration').dispatchEvent(new Event('input'))">3 Jam</button>
+              <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 8px;" onclick="document.getElementById('soundLayerTargetDuration').value=36000;document.getElementById('soundLayerTargetDuration').dispatchEvent(new Event('input'))">10 Jam</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Format Output</label>
+            <select id="soundLayerOutputFormat" class="input">
+              <option value="aac" selected>AAC — Ukuran kecil, M4A format</option>
+              <option value="wav">WAV — Kualitas lossless, ukuran besar</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">XFade Loop Base Layer</label>
+            <input type="number" id="soundLayerLoopXfade" class="input" value="2.0" min="0" max="10" step="0.5">
+            <p class="field-hint">Detik. Transisi putar ulang.</p>
+          </div>
         </div>
 
         <!-- Optional Sound Pool Selection -->
@@ -323,9 +287,12 @@
 
         <!-- Actions -->
         <div class="section-divider"></div>
+        <div style="display:flex; gap:10px; margin-bottom: 12px;">
+            <button class="btn btn-secondary" id="soundLayerPreviewPlanBtn" style="flex:1;">🎲 Plan Layers</button>
+        </div>
         <div class="controls-grid">
-          <button class="btn btn-secondary btn-full" id="soundLayerPreviewBtn">🎲 Preview Placement</button>
-          <button class="btn btn-primary btn-full" id="soundLayerRenderBtn">▶ Render Mix</button>
+          <button class="btn btn-secondary btn-full" id="soundLayerPreviewMixBtn" style="background-color: var(--primary-dark); color: white;">🔊 Preview Mix (15s)</button>
+          <button class="btn btn-primary btn-full" id="soundLayerRenderBtn">▶ Render Full Output</button>
         </div>
 
         <!-- Progress and Output -->
