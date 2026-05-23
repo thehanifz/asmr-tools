@@ -63,7 +63,7 @@ if errorlevel 1 (
 echo [CHECK] Memeriksa port 8000...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') do (
     echo [KILL] Menutup proses lama di port 8000 ^(PID: %%a^)...
-    taskkill /PID %%a /F >nul 2>&1
+    taskkill /T /F /PID %%a >nul 2>&1
 )
 echo [OK] Port 8000 bebas
 

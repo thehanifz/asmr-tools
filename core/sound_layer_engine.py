@@ -669,15 +669,21 @@ class SoundLayerEngine:
         import random
         import sys
         
-        # Validate optional sound files are available
-        if not self.optional_sound_files:
-            raise ValueError("No optional sound files available. Call scan_optional_sounds() first.")
-        
         # Get target duration directly from config
         self.main_duration = self.config.target_duration
         
         if self.main_duration <= 0:
             raise ValueError(f"Target duration must be > 0: {self.main_duration}")
+            
+        # If no optional sounds, just return an empty plan
+        if not self.optional_sound_files:
+            return PlacementPlan(
+                version="1.0",
+                main_sounds=self.config.main_sounds,
+                optional_sounds_folder=self.config.optional_sounds_folder,
+                target_duration=self.main_duration,
+                placements=[]
+            )
         
         # Determine time window end (use target_duration if not specified)
         time_window_start = self.config.time_window_start

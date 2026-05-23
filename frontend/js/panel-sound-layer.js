@@ -140,15 +140,9 @@ export function initSoundLayer() {
   $("soundLayerPreviewPlanBtn").addEventListener("click", async () => {
     const folder = $("soundLayerFolder").value.trim();
     if (AppState.mainSounds.length === 0) { toast("Pilih minimal 1 main sound", "error"); return; }
-    if (!folder) { toast("Pilih folder optional sound dulu", "error"); return; }
 
     const checkboxes = document.querySelectorAll("#soundLayerPoolList .pool-checkbox:checked");
     const includedFiles = Array.from(checkboxes).map(cb => cb.dataset.path);
-
-    if (includedFiles.length === 0) {
-      toast("Pilih minimal satu file opsional dari pool", "error");
-      return;
-    }
 
     logClear("soundLayerLog");
     logAppend("soundLayerLog", "Membuat rencana penempatan...");

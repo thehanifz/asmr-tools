@@ -58,10 +58,7 @@ async def preview_placement(request: Request):
         
         if not main_sounds:
             return JSONResponse({"error": "At least one main sound is required"}, status_code=400)
-        if not optional_sounds_folder:
-            return JSONResponse({"error": "Optional sounds folder is required"}, status_code=400)
-        if not included_files:
-            return JSONResponse({"error": "At least one optional sound must be selected"}, status_code=400)
+
 
         # Build config
         config = LayerConfig(
@@ -83,12 +80,11 @@ async def preview_placement(request: Request):
         )
         
         engine = SoundLayerEngine(config)
-        engine.scan_optional_sounds()
-        
-        # Filter files to only what is included by user
-        engine.optional_sound_files = [f for f in engine.optional_sound_files if f in included_files]
-        if not engine.optional_sound_files:
-            return JSONResponse({"error": "None of the selected files are valid or exist in the folder"}, status_code=400)
+        if optional_sounds_folder:
+            engine.scan_optional_sounds()
+            
+            # Filter files to only what is included by user
+            engine.optional_sound_files = [f for f in engine.optional_sound_files if f in included_files]
             
         plan = await engine.generate_placement_plan()
         return JSONResponse(json.loads(plan.to_json()))
