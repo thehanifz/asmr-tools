@@ -23,6 +23,58 @@ export function initVideo() {
   syncCtrl('videoFadeOutEnabled', 'fadeOutControls');
   syncCtrl('videoXfadeEnabled',   'xfadeControls');
 
+  // ── collapsibles ──────────────────────────────────────────
+  function initCollapsible(toggleId, bodyId, defaultOpen = false) {
+    const toggle = $(toggleId);
+    const body   = $(bodyId);
+    if (!toggle || !body) return;
+    if (defaultOpen) {
+      body.classList.add("open");
+      toggle.setAttribute("aria-expanded", "true");
+    }
+    toggle.addEventListener("click", () => {
+      const isOpen = body.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", String(isOpen));
+    });
+  }
+
+  initCollapsible("toggleCrop",   "cropBody",   true);
+  initCollapsible("toggleFade",   "fadeBody",   false);
+  initCollapsible("toggleXfade",  "xfadeBody",  false);
+
+  function updateCropSummary() {
+    const t = $("cropTop").value    || "0";
+    const b = $("cropBottom").value || "0";
+    const l = $("cropLeft").value   || "0";
+    const r = $("cropRight").value  || "0";
+    const res = $("upscaleRes").value;
+    const resLabel = res ? res.replace(":", "×") : "—";
+    if ($("cropSummary")) $("cropSummary").textContent = `T:${t} B:${b} L:${l} R:${r} | ${resLabel}`;
+  }
+  function updateFadeSummary() {
+    const fi = $("videoFadeInEnabled").checked;
+    const fo = $("videoFadeOutEnabled").checked;
+    if (!$("fadeSummary")) return;
+    if (!fi && !fo) { $("fadeSummary").textContent = "OFF"; return; }
+    const parts = [];
+    if (fi) parts.push(`In:${$("videoFadeInDuration").value}s`);
+    if (fo) parts.push(`Out:${$("videoFadeOutDuration").value}s`);
+    $("fadeSummary").textContent = parts.join(" ");
+  }
+  function updateXfadeSummary() {
+    const en = $("videoXfadeEnabled").checked;
+    if (!$("xfadeSummary")) return;
+    $("xfadeSummary").textContent = en
+      ? `${$("videoXfadeDuration").value}s / ${$("videoXfadeType").value}`
+      : "OFF";
+  }
+
+  ["cropTop","cropBottom","cropLeft","cropRight","upscaleRes"].forEach(id => $(id)?.addEventListener("input", updateCropSummary));
+  ["videoFadeInEnabled","videoFadeOutEnabled","videoFadeInDuration","videoFadeOutDuration"].forEach(id => $(id)?.addEventListener("change", updateFadeSummary));
+  ["videoXfadeEnabled","videoXfadeDuration","videoXfadeType"].forEach(id => $(id)?.addEventListener("change", updateXfadeSummary));
+  
+  updateCropSummary(); updateFadeSummary(); updateXfadeSummary();
+
   // ── browse ────────────────────────────────────────────────
   $('videoBrowse').addEventListener('click', async () => {
     const path = await browseVideo();

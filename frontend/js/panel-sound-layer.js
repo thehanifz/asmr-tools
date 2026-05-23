@@ -136,13 +136,88 @@ export function initSoundLayer() {
     document.querySelectorAll("#soundLayerPoolList .pool-checkbox").forEach(cb => cb.checked = false);
   });
 
+  // ── Optional Sound Pool Controls (V4-5, V4-6) ────────
+  $("optionalSoundControls")?.classList.add("ctrl-off");
+
+  $("soundLayerOptionalEnabled")?.addEventListener("change", e => {
+    $("optionalSoundControls")?.classList.toggle("ctrl-off", !e.target.checked);
+  });
+
+  document.querySelectorAll("input[name='optionalMode']").forEach(radio => {
+    radio.addEventListener("change", e => {
+      $("optionalFolderMode")?.classList.toggle("hidden", e.target.value !== "folder");
+      $("optionalFilesMode")?.classList.toggle("hidden", e.target.value !== "files");
+    });
+  });
+
+  AppState.optionalIndividualFiles = [];
+
+  $("optionalAddFile")?.addEventListener("click", async () => {
+    try {
+      const path = await browseAudio();
+      if (!path) return;
+      const probe = await probeFile(path);
+      const dur   = probe?.duration ?? 0;
+      const name  = path.split(/[/\\]/).pop();
+      AppState.optionalIndividualFiles.push({ path, name, duration: dur });
+      renderIndividualFileList();
+    } catch (e) {
+      toast("Gagal menambah file: " + e.message, "error");
+    }
+  });
+
+  function renderIndividualFileList() {
+    const list = $("optionalIndividualFileList");
+    if (!list) return;
+    list.innerHTML = "";
+    AppState.optionalIndividualFiles.forEach((f, idx) => {
+      const div = document.createElement("div");
+      div.className = "pool-item";
+      div.innerHTML = `
+        <span class="pool-item-name" title="${f.path}">${f.name}</span>
+        <span class="pool-item-dur">${f.duration.toFixed(1)}s</span>
+        <button class="btn btn-ghost"
+                style="color:var(--danger);padding:2px 6px;margin-left:auto;"
+                data-idx="${idx}">×</button>
+      `;
+      div.querySelector("button").addEventListener("click", () => {
+        AppState.optionalIndividualFiles.splice(idx, 1);
+        renderIndividualFileList();
+      });
+      list.appendChild(div);
+    });
+  }
+
+  function getIncludedFiles() {
+    const optEnabled = $("soundLayerOptionalEnabled")?.checked;
+    if (!optEnabled) return [];
+    const mode = document.querySelector("input[name='optionalMode']:checked")?.value;
+    if (mode === "files") {
+      return AppState.optionalIndividualFiles.map(f => f.path);
+    }
+    return Array.from(
+      document.querySelectorAll("#soundLayerPoolList .pool-checkbox:checked")
+    ).map(cb => cb.dataset.path);
+  }
+
   // ── Preview Placement (Plan Layers) ────────────────────────
   $("soundLayerPreviewPlanBtn").addEventListener("click", async () => {
     const folder = $("soundLayerFolder").value.trim();
     if (AppState.mainSounds.length === 0) { toast("Pilih minimal 1 main sound", "error"); return; }
 
-    const checkboxes = document.querySelectorAll("#soundLayerPoolList .pool-checkbox:checked");
-    const includedFiles = Array.from(checkboxes).map(cb => cb.dataset.path);
+    const optEnabled = $("soundLayerOptionalEnabled")?.checked;
+    if (optEnabled) {
+      const mode = document.querySelector("input[name='optionalMode']:checked")?.value;
+      if (mode === "folder" && !folder) {
+        toast("Pilih folder atau matikan Optional Sound Pool", "error");
+        return;
+      }
+      if (mode === "files" && AppState.optionalIndividualFiles.length === 0) {
+        toast("Tambah file individual atau matikan Optional Sound Pool", "error");
+        return;
+      }
+    }
+    const includedFiles = getIncludedFiles();
 
     logClear("soundLayerLog");
     logAppend("soundLayerLog", "Membuat rencana penempatan...");
@@ -169,7 +244,7 @@ export function initSoundLayer() {
 
     const payload = {
       main_sounds: AppState.mainSounds,
-      optional_sounds_folder: folder,
+      optional_sounds_folder: optEnabled && document.querySelector("input[name='optionalMode']:checked")?.value === "folder" ? folder : "",
       included_files: includedFiles,
       target_duration: targetDuration,
       loop_xfade: loopXfade,

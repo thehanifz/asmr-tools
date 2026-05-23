@@ -6,7 +6,7 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str, safe_remove_file
-from core.env import get_thread_flags
+from core.env import get_thread_flags, video_encoder_flags, USE_NVENC
 
 router = APIRouter(prefix="/video", tags=["video"])
 
@@ -18,9 +18,7 @@ def cmd_crop(input_path, output_path, top=0, bottom=0, left=0, right=0):
     return [
         "ffmpeg", "-y", *get_thread_flags(), "-i", input_path,
         "-vf", vf,
-        "-c:v", "libx264", "-crf", "23", "-preset", "fast",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
+        *video_encoder_flags(crf=23, preset="fast"),
         "-c:a", "copy",
         output_path,
     ]
@@ -37,9 +35,7 @@ def cmd_upscale(input_path, output_path, resolution="1920:1080", algo="lanczos",
     return [
         "ffmpeg", "-y", *get_thread_flags(), "-i", input_path,
         "-vf", f"scale={w}:{h}:flags={algo}",
-        "-c:v", "libx264", "-crf", str(crf), "-preset", "fast",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
+        *video_encoder_flags(crf=crf, preset="fast"),
         "-maxrate", "8000k", "-bufsize", "16000k",
         "-c:a", "copy",
         output_path,
@@ -81,9 +77,7 @@ def cmd_fade_video(input_path, output_path, duration,
     return [
         "ffmpeg", "-y", *get_thread_flags(), "-i", input_path,
         "-vf", vf,
-        "-c:v", "libx264", "-crf", "23", "-preset", "fast",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
+        *video_encoder_flags(crf=23, preset="fast"),
         "-an",
         output_path,
     ]
@@ -116,15 +110,18 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
     output_dir = os.path.dirname(output_path) or os.path.dirname(input_path)
     basename   = os.path.splitext(os.path.basename(input_path))[0]
 
-    enc_flags = [
-        "-c:v", "libx264",
-        "-profile:v", "high",
-        "-level", "4.1",
-        "-pix_fmt", "yuv420p",
-        "-crf", "23",
-        "-preset", "fast",
-        "-movflags", "+faststart",
-    ]
+    if USE_NVENC:
+        enc_flags = video_encoder_flags(crf=23, preset="fast")
+    else:
+        enc_flags = [
+            "-c:v", "libx264",
+            "-profile:v", "high",
+            "-level", "4.1",
+            "-pix_fmt", "yuv420p",
+            "-crf", "23",
+            "-preset", "fast",
+            "-movflags", "+faststart",
+        ]
 
     if n_total <= MAX_XFADE_SEGMENTS:
         fc = build_xfade_filter(n_total, xd, vd)
@@ -295,6 +292,8 @@ async def video_pipeline(request: Request):
 
     async def run():
         total_start = time.time()
+        encoder_name = "h264_nvenc ⚡" if USE_NVENC else "libx264 🖥"
+        yield f"data: {json.dumps({'log': f'Encoder: {encoder_name}'})}\n\n"
         yield f"data: {json.dumps({'type': 'pipeline_start', 'total_steps': len(steps)})}\n\n"
 
         for i, (cmd, label, out_file) in enumerate(steps):

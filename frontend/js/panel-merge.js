@@ -79,6 +79,11 @@ export function initMerge() {
   $("mergeAudioSourceManual").addEventListener("change", syncMergeAudioSource);
   $("mergeAudioSourceLayer").addEventListener("change", syncMergeAudioSource);
 
+  // Ubah default: Sound Layer Output menjadi pilihan awal
+  const radioLayer = document.getElementById("mergeAudioSourceLayer");
+  if (radioLayer) radioLayer.checked = true;
+  syncMergeAudioSource(); // trigger UI sesuai default baru
+
   // Auto-fill when navigating to merge
   document.querySelector('.nav-item[data-tool="merge"]')?.addEventListener("click", () => {
     if (AppState.videoProcessedPath && !$("mergeVideo").value) {

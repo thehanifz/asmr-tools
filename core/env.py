@@ -35,7 +35,7 @@ def _check_nvenc() -> bool:
     except Exception:
         return False
 
-USE_NVENC: bool = IS_COLAB and _check_nvenc()
+USE_NVENC: bool = _check_nvenc()
 
 # ── 3. Deteksi RIFE ───────────────────────────────────────────────────────────
 def _check_rife() -> bool:
@@ -105,7 +105,7 @@ def get_thread_flags() -> list[str]:
         logical_cpu = multiprocessing.cpu_count()
     except Exception:
         logical_cpu = 4
-    recommended_threads = str(min(8, logical_cpu))
+    recommended_threads = str(max(1, logical_cpu - 1))
     
     return [
         "-threads", "0",

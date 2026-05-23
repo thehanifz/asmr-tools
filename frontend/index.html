@@ -32,6 +32,15 @@
       <button class="nav-item" data-tool="merge"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>Merge</span></button>
       <button class="nav-item" data-tool="thumbnail"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg><span>Thumbnail</span></button>
     </nav>
+    <div class="sidebar-cleanup">
+      <button class="btn-cleanup" id="btnAutoCleanup" title="Hapus semua file temporary (_tmp_*) di workspace">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+        Auto Cleanup
+      </button>
+    </div>
     <div class="sidebar-workspace">
       <div class="workspace-label">Workspace</div>
       <div class="workspace-path" id="workspacePath">—</div>
@@ -57,68 +66,91 @@
         </div>
 
         <!-- Crop + Upscale -->
-        <div class="controls-grid">
-          <div class="field-group"><label class="field-label">Crop Atas (px)</label><input type="number" id="cropTop" class="input" value="0" min="0"></div>
-          <div class="field-group"><label class="field-label">Crop Bawah (px)</label><input type="number" id="cropBottom" class="input" value="0" min="0"></div>
-          <div class="field-group"><label class="field-label">Crop Kiri (px)</label><input type="number" id="cropLeft" class="input" value="0" min="0"></div>
-          <div class="field-group"><label class="field-label">Crop Kanan (px)</label><input type="number" id="cropRight" class="input" value="0" min="0"></div>
-          <div class="field-group">
-            <label class="field-label">Upscale</label>
-            <select id="upscaleRes" class="input">
-              <option value="">— Skip —</option>
-              <option value="1920:1080">FHD 1920×1080</option>
-              <option value="2560:1440">QHD 2560×1440</option>
-              <option value="3840:2160">4K 3840×2160</option>
-            </select>
+        <div class="collapsible-section">
+          <button class="section-toggle" id="toggleCrop" aria-expanded="true">
+            <span class="section-title">✂ Crop &amp; Upscale</span>
+            <span class="section-summary" id="cropSummary">T:0 B:0 L:0 R:0 | —</span>
+            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="section-body open" id="cropBody">
+            <div class="controls-grid" style="margin-top: 12px;">
+              <div class="field-group"><label class="field-label">Crop Atas (px)</label><input type="number" id="cropTop" class="input" value="0" min="0"></div>
+              <div class="field-group"><label class="field-label">Crop Bawah (px)</label><input type="number" id="cropBottom" class="input" value="0" min="0"></div>
+              <div class="field-group"><label class="field-label">Crop Kiri (px)</label><input type="number" id="cropLeft" class="input" value="0" min="0"></div>
+              <div class="field-group"><label class="field-label">Crop Kanan (px)</label><input type="number" id="cropRight" class="input" value="0" min="0"></div>
+              <div class="field-group">
+                <label class="field-label">Upscale</label>
+                <select id="upscaleRes" class="input">
+                  <option value="">— Skip —</option>
+                  <option value="1920:1080">FHD 1920×1080</option>
+                  <option value="2560:1440">QHD 2560×1440</option>
+                  <option value="3840:2160">4K 3840×2160</option>
+                </select>
+              </div>
+              <div class="field-group"><label class="field-label">Durasi Loop (detik)</label><input type="number" id="videoDuration" class="input" value="3600" min="1"></div>
+            </div>
           </div>
-          <div class="field-group"><label class="field-label">Durasi Loop (detik)</label><input type="number" id="videoDuration" class="input" value="3600" min="1"></div>
         </div>
 
         <!-- Fade In / Out -->
-        <div class="section-divider"></div>
-        <div class="field-group">
-          <label class="field-label">Fade In / Fade Out</label>
-          <p class="field-hint">Diterapkan pada output final — hitam ke video (fade in) dan video ke hitam (fade out).</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
-            <div>
-              <div class="checkbox-row" style="margin-bottom:8px;">
-                <label class="checkbox-label"><input type="checkbox" id="videoFadeInEnabled"><span class="checkmark"></span>Fade In</label>
-              </div>
-              <div class="ctrl-field ctrl-off" id="fadeInControls">
-                <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
-                <input type="number" id="videoFadeInDuration" class="input" value="3" min="0.1" max="60" step="0.5">
-              </div>
-            </div>
-            <div>
-              <div class="checkbox-row" style="margin-bottom:8px;">
-                <label class="checkbox-label"><input type="checkbox" id="videoFadeOutEnabled"><span class="checkmark"></span>Fade Out</label>
-              </div>
-              <div class="ctrl-field ctrl-off" id="fadeOutControls">
-                <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
-                <input type="number" id="videoFadeOutDuration" class="input" value="3" min="0.1" max="60" step="0.5">
+        <div class="collapsible-section">
+          <button class="section-toggle" id="toggleFade" aria-expanded="false">
+            <span class="section-title">🌅 Fade In / Fade Out</span>
+            <span class="section-summary" id="fadeSummary">OFF</span>
+            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="section-body" id="fadeBody">
+            <div class="field-group" style="margin-top: 12px;">
+              <p class="field-hint">Diterapkan pada output final — hitam ke video (fade in) dan video ke hitam (fade out).</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+                <div>
+                  <div class="checkbox-row" style="margin-bottom:8px;">
+                    <label class="checkbox-label"><input type="checkbox" id="videoFadeInEnabled"><span class="checkmark"></span>Fade In</label>
+                  </div>
+                  <div class="ctrl-field ctrl-off" id="fadeInControls">
+                    <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
+                    <input type="number" id="videoFadeInDuration" class="input" value="3" min="0.1" max="60" step="0.5">
+                  </div>
+                </div>
+                <div>
+                  <div class="checkbox-row" style="margin-bottom:8px;">
+                    <label class="checkbox-label"><input type="checkbox" id="videoFadeOutEnabled"><span class="checkmark"></span>Fade Out</label>
+                  </div>
+                  <div class="ctrl-field ctrl-off" id="fadeOutControls">
+                    <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
+                    <input type="number" id="videoFadeOutDuration" class="input" value="3" min="0.1" max="60" step="0.5">
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- XFade Loop -->
-        <div class="section-divider"></div>
-        <div class="field-group">
-          <label class="field-label">Loop Transition (XFade)</label>
-          <p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa.</p>
-          <div class="checkbox-row" style="margin-bottom:12px;">
-            <label class="checkbox-label"><input type="checkbox" id="videoXfadeEnabled"><span class="checkmark"></span>Aktifkan XFade seamless loop</label>
-          </div>
-          <div class="ctrl-field ctrl-off" id="xfadeControls" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label">Durasi XFade <span class="field-hint" style="display:inline;margin-left:4px;">detik</span></label>
-              <input type="number" id="videoXfadeDuration" class="input" value="1.0" min="0.1" max="10" step="0.1">
-              <p class="field-hint" style="margin-top:4px;">Rekomendasi ASMR: 0.5 – 1.5s</p>
-            </div>
-            <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label">Efek Transisi</label>
-              <select id="videoXfadeType" class="input"><option value="fade" selected>Fade (smooth)</option></select>
-              <p class="field-hint" style="margin-top:4px;">Membutuhkan re-encode penuh.</p>
+        <div class="collapsible-section">
+          <button class="section-toggle" id="toggleXfade" aria-expanded="false">
+            <span class="section-title">🔄 Loop Transition (XFade)</span>
+            <span class="section-summary" id="xfadeSummary">OFF</span>
+            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="section-body" id="xfadeBody">
+            <div class="field-group" style="margin-top: 12px;">
+              <p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa.</p>
+              <div class="checkbox-row" style="margin-bottom:12px;">
+                <label class="checkbox-label"><input type="checkbox" id="videoXfadeEnabled"><span class="checkmark"></span>Aktifkan XFade seamless loop</label>
+              </div>
+              <div class="ctrl-field ctrl-off" id="xfadeControls" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="field-group" style="margin-bottom:0;">
+                  <label class="field-label">Durasi XFade <span class="field-hint" style="display:inline;margin-left:4px;">detik</span></label>
+                  <input type="number" id="videoXfadeDuration" class="input" value="1.0" min="0.1" max="10" step="0.1">
+                  <p class="field-hint" style="margin-top:4px;">Rekomendasi ASMR: 0.5 – 1.5s</p>
+                </div>
+                <div class="field-group" style="margin-bottom:0;">
+                  <label class="field-label">Efek Transisi</label>
+                  <select id="videoXfadeType" class="input"><option value="fade" selected>Fade (smooth)</option></select>
+                  <p class="field-hint" style="margin-top:4px;">Membutuhkan re-encode penuh.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -199,22 +231,58 @@
         </div>
 
         <!-- Optional Sound Pool Selection -->
+        <div class="section-divider"></div>
         <div class="field-group">
-          <label class="field-label">Optional Sound Pool Folder</label>
-          <div class="file-row">
-            <input type="text" id="soundLayerFolder" class="file-input" placeholder="Pilih folder berisi suara opsional..." readonly>
-            <button class="btn btn-secondary" id="soundLayerFolderBrowse">Browse Folder</button>
+          <div class="checkbox-row" style="margin-bottom:10px;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="soundLayerOptionalEnabled">
+              <span class="checkmark"></span>Aktifkan Optional Sound Pool
+            </label>
           </div>
-          <!-- Scanned file pool container -->
-          <div id="soundLayerPoolContainer" class="pool-container hidden">
-            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-              <span>Pilih file untuk digunakan sebagai pool:</span>
-              <div>
-                <button class="btn btn-ghost btn-add" style="padding: 2px 6px; font-size: 10px;" id="soundLayerPoolAll">All</button>
-                <button class="btn btn-ghost btn-add" style="padding: 2px 6px; font-size: 10px; margin-left: 4px;" id="soundLayerPoolNone">None</button>
+          <div class="ctrl-field ctrl-off" id="optionalSoundControls">
+            <!-- V4-6: mode selector -->
+            <div style="display:flex;gap:16px;margin-bottom:12px;">
+              <label class="checkbox-label">
+                <input type="radio" name="optionalMode" value="folder" checked>
+                <span class="checkmark" style="border-radius:50%"></span> Folder
+              </label>
+              <label class="checkbox-label">
+                <input type="radio" name="optionalMode" value="files">
+                <span class="checkmark" style="border-radius:50%"></span> File Individual
+              </label>
+            </div>
+            <!-- Mode Folder (existing) -->
+            <div id="optionalFolderMode">
+              <label class="field-label">Optional Sound Pool Folder</label>
+              <div class="file-row">
+                <input type="text" id="soundLayerFolder" class="file-input"
+                       placeholder="Pilih folder berisi suara opsional..." readonly>
+                <button class="btn btn-secondary" id="soundLayerFolderBrowse">Browse Folder</button>
+              </div>
+              <div id="soundLayerPoolContainer" class="pool-container hidden">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;
+                            display:flex;justify-content:space-between;align-items:center;">
+                  <span>Pilih file untuk digunakan sebagai pool:</span>
+                  <div>
+                    <button class="btn btn-ghost btn-add"
+                            style="padding:2px 6px;font-size:10px;" id="soundLayerPoolAll">All</button>
+                    <button class="btn btn-ghost btn-add"
+                            style="padding:2px 6px;font-size:10px;margin-left:4px;"
+                            id="soundLayerPoolNone">None</button>
+                  </div>
+                </div>
+                <div id="soundLayerPoolList"></div>
               </div>
             </div>
-            <div id="soundLayerPoolList"></div>
+            <!-- Mode File Individual (baru) -->
+            <div id="optionalFilesMode" class="hidden">
+              <label class="field-label">File Audio Individual</label>
+              <div id="optionalIndividualFileList"
+                   style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+              <button class="btn btn-ghost btn-add" id="optionalAddFile">
+                + Tambah File Audio
+              </button>
+            </div>
           </div>
         </div>
 

@@ -7,6 +7,8 @@ import { initSoundLayer } from './panel-sound-layer.js';
 import { initDenoise }    from './panel-denoise.js';
 import { initMerge }      from './panel-merge.js';
 import { initThumbnail }  from './panel-thumbnail.js';
+import { AppState }       from './state.js';
+import { toast }          from './ui.js';
 
 const TOOLS = ['video', 'extract', 'sound-layer', 'denoise', 'merge', 'thumbnail'];
 
@@ -31,3 +33,40 @@ initThumbnail();
 
 // Default: video
 activateTool('video');
+
+// ── Auto Cleanup ──────────────────────────────────────────────────
+document.getElementById('btnAutoCleanup')?.addEventListener('click', async () => {
+  if (!AppState.workspaceDir) {
+    toast('Workspace belum aktif. Buka file video/audio dulu.', 'error');
+    return;
+  }
+  
+  if (!confirm(`Hapus semua file temporary (_tmp_*) di workspace ini?\n\n${AppState.workspaceDir}`)) {
+    return;
+  }
+
+  const btn = document.getElementById('btnAutoCleanup');
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<span class="loading-spinner"></span> Cleaning...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/cleanup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspace: AppState.workspaceDir })
+    });
+    const data = await res.json();
+    
+    if (data.status === 'success') {
+      toast(data.message, 'success');
+    } else {
+      toast('Gagal: ' + data.message, 'error');
+    }
+  } catch (err) {
+    toast('Error saat cleanup: ' + err.message, 'error');
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+});

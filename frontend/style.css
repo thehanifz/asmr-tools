@@ -563,3 +563,48 @@ option { background: var(--bg-card); }
   white-space: nowrap;
 }
 
+/* ── COLLAPSIBLE SECTION ───────────────────────── */
+.collapsible-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.section-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: var(--bg-card); border: none;
+  cursor: pointer; color: var(--text); font-size: 13px; font-weight: 500;
+  transition: background 160ms var(--transition);
+}
+.section-toggle:hover { background: var(--bg-hover); }
+.section-summary {
+  margin-left: auto; font-size: 11px;
+  color: var(--text-muted); font-family: var(--font-mono);
+}
+.toggle-chevron { flex-shrink: 0; transition: transform 250ms ease; }
+.section-toggle[aria-expanded="true"] .toggle-chevron { transform: rotate(180deg); }
+.section-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 250ms ease;
+  padding: 0 14px;
+}
+.section-body.open {
+  max-height: 800px;
+  padding: 0 14px 14px;
+}
+
+/* ── SIDEBAR CLEANUP ───────────────────────────── */
+.sidebar-cleanup { padding: 0 8px 14px; flex-shrink: 0; margin-top: auto; }
+.btn-cleanup {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; padding: 6px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-muted); font-size: 12px; cursor: pointer;
+  transition: all 160ms var(--transition); font-family: inherit;
+}
+.btn-cleanup:hover {
+  background: rgba(239,68,68,0.08);
+  color: #f87171;
+  border-color: rgba(239,68,68,0.3);
+}
