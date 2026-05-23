@@ -7,7 +7,7 @@ router = APIRouter(prefix="/cleanup", tags=["cleanup"])
 class CleanupRequest(BaseModel):
     workspace: str
 
-@router.post("/")
+@router.post("")
 def auto_cleanup(req: CleanupRequest):
     """Hapus semua file _tmp_ di dalam folder workspace."""
     if not req.workspace or not os.path.isdir(req.workspace):
