@@ -23,15 +23,31 @@ IS_COLAB: bool = _detect_colab()
 # ── 2. Deteksi NVENC (GPU encoder) ────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def _check_nvenc() -> bool:
-    """Return True jika FFmpeg tersedia dan support nvenc."""
+    """Return True jika FFmpeg tersedia dan NVENC benar-benar berfungsi."""
     if shutil.which("ffmpeg") is None:
         return False
     try:
+        # Cek apakah h264_nvenc terdaftar di ffmpeg -encoders
         result = subprocess.run(
             ["ffmpeg", "-hide_banner", "-encoders"],
             capture_output=True, text=True, timeout=10
         )
-        return "h264_nvenc" in result.stdout
+        if "h264_nvenc" not in result.stdout:
+            return False
+
+        # Cek apakah h264_nvenc benar-benar bisa dijalankan (bukan cuma terdaftar)
+        # karena bisa jadi nvcuda.dll / driver GPU NVIDIA tidak terinstal/tidak bisa diload
+        test_result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-hide_banner",
+                "-f", "lavfi", "-i", "color=c=black:s=16x16",
+                "-frames:v", "1",
+                "-c:v", "h264_nvenc",
+                "-f", "null", "-"
+            ],
+            capture_output=True, text=True, timeout=5
+        )
+        return test_result.returncode == 0
     except Exception:
         return False
 
