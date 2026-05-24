@@ -10,6 +10,97 @@
   <style>
     .ctrl-field { transition: opacity 0.2s ease; }
     .ctrl-field.ctrl-off { opacity: 0.38; pointer-events: none; user-select: none; }
+
+    /* Optional Sound Items */
+    .opt-sound-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--bg-card);
+    }
+    .opt-sound-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      user-select: none;
+      background: var(--bg-hover);
+    }
+    .opt-sound-header:hover { background: var(--bg-active); }
+    .opt-expand-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .opt-chevron { transition: transform 0.2s ease; }
+    .opt-sound-name {
+      flex: 1;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .opt-sound-dur {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .opt-sound-est {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--primary);
+      flex-shrink: 0;
+      min-width: 30px;
+      text-align: right;
+    }
+    .opt-remove-btn { flex-shrink: 0; }
+    .opt-sound-body {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+    .opt-sound-body.collapsed { display: none; }
+    .opt-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .opt-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      min-width: 80px;
+      flex-shrink: 0;
+    }
+    .opt-vol-val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      min-width: 36px;
+      text-align: right;
+    }
+    .opt-unit { font-size: 11px; color: var(--text-muted); }
+    .opt-radio-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .opt-radio-lbl {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .opt-radio-lbl input { accent-color: var(--primary); cursor: pointer; }
   </style>
 </head>
 <body>
@@ -24,71 +115,38 @@
       <span class="sidebar-logo-text">ASMR Tools</span>
     </div>
     <nav class="sidebar-nav">
-      <!-- Crop & Upscale -->
       <button class="nav-item active" data-tool="crop">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <polyline points="6 2 6 8 2 8"/><polyline points="18 22 18 16 22 16"/>
-          <path d="M6 8H22"/><path d="M2 16H18"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 2 6 8 2 8"/><polyline points="18 22 18 16 22 16"/><path d="M6 8H22"/><path d="M2 16H18"/></svg>
         <span>Crop</span>
       </button>
-      <!-- Video Loop -->
       <button class="nav-item" data-tool="video">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <rect x="2" y="4" width="16" height="16" rx="2"/>
-          <polygon points="22,4 22,20 16,12"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="16" height="16" rx="2"/><polygon points="22,4 22,20 16,12"/></svg>
         <span>Video Loop</span>
       </button>
-      <!-- Extract -->
       <button class="nav-item" data-tool="extract">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="22"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
         <span>Extract</span>
       </button>
-      <!-- Sound Layer -->
       <button class="nav-item" data-tool="sound-layer">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
         <span>Sound Layer</span>
       </button>
-      <!-- Denoise -->
       <button class="nav-item" data-tool="denoise">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         <span>Denoise</span>
       </button>
-      <!-- Merge -->
       <button class="nav-item" data-tool="merge">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/>
-          <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/>
-          <line x1="12" y1="8" x2="12" y2="16"/>
-          <line x1="8" y1="12" x2="16" y2="12"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         <span>Merge</span>
       </button>
-      <!-- Thumbnail -->
       <button class="nav-item" data-tool="thumbnail">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21,15 16,10 5,21"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
         <span>Thumbnail</span>
       </button>
     </nav>
     <div class="sidebar-cleanup">
       <button class="btn-cleanup" id="btnAutoCleanup" title="Hapus semua file temporary (_tmp_*) di workspace">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         Auto Cleanup
       </button>
     </div>
@@ -100,94 +158,33 @@
 
   <main class="workspace">
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- PANEL: Crop & Upscale                                       -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Crop & Upscale -->
     <section class="tool-panel" id="tool-crop">
-      <div class="tool-header">
-        <h1 class="tool-title">Crop &amp; Upscale</h1>
-        <span class="tool-badge">Potong tepi + Rescale resolusi</span>
-      </div>
+      <div class="tool-header"><h1 class="tool-title">Crop &amp; Upscale</h1><span class="tool-badge">Potong tepi + Rescale resolusi</span></div>
       <div class="tool-body">
-
-        <!-- File input -->
-        <div class="field-group">
-          <label class="field-label">File Video</label>
-          <div class="file-row">
-            <input type="text" id="cropInput" class="file-input" placeholder="Pilih file video..." readonly>
-            <button class="btn btn-secondary" id="cropBrowse">Browse</button>
-          </div>
-          <div class="file-info" id="cropInfo"></div>
-        </div>
-
-        <!-- Crop controls -->
+        <div class="field-group"><label class="field-label">File Video</label><div class="file-row"><input type="text" id="cropInput" class="file-input" placeholder="Pilih file video..." readonly><button class="btn btn-secondary" id="cropBrowse">Browse</button></div><div class="file-info" id="cropInfo"></div></div>
         <div class="controls-grid">
           <div class="field-group"><label class="field-label">Crop Atas (px)</label><input type="number" id="cropPanelTop" class="input" value="0" min="0"></div>
           <div class="field-group"><label class="field-label">Crop Bawah (px)</label><input type="number" id="cropPanelBottom" class="input" value="0" min="0"></div>
           <div class="field-group"><label class="field-label">Crop Kiri (px)</label><input type="number" id="cropPanelLeft" class="input" value="0" min="0"></div>
           <div class="field-group"><label class="field-label">Crop Kanan (px)</label><input type="number" id="cropPanelRight" class="input" value="0" min="0"></div>
-          <div class="field-group">
-            <label class="field-label">Upscale Resolusi</label>
-            <select id="cropUpscaleRes" class="input">
-              <option value="">— Skip —</option>
-              <option value="1920:1080">FHD 1920×1080</option>
-              <option value="2560:1440">QHD 2560×1440</option>
-              <option value="3840:2160">4K 3840×2160</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label class="field-label">CRF Quality <span class="field-hint">(18=terbaik, 28=kecil)</span></label>
-            <input type="number" id="cropCrf" class="input" value="23" min="12" max="35">
-          </div>
+          <div class="field-group"><label class="field-label">Upscale Resolusi</label><select id="cropUpscaleRes" class="input"><option value="">— Skip —</option><option value="1920:1080">FHD 1920×1080</option><option value="2560:1440">QHD 2560×1440</option><option value="3840:2160">4K 3840×2160</option></select></div>
+          <div class="field-group"><label class="field-label">CRF Quality <span class="field-hint">(18=terbaik, 28=kecil)</span></label><input type="number" id="cropCrf" class="input" value="23" min="12" max="35"></div>
         </div>
-
-        <div class="field-group">
-          <label class="field-label">Summary</label>
-          <div class="field-hint" id="cropPanelSummary" style="font-family:var(--font-mono);font-size:0.8rem;">T:0 B:0 L:0 R:0 | —</div>
-        </div>
-
-        <!-- Output -->
-        <div class="field-group">
-          <label class="field-label">Output</label>
-          <input type="text" id="cropOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
-        </div>
-
+        <div class="field-group"><label class="field-label">Summary</label><div class="field-hint" id="cropPanelSummary" style="font-family:var(--font-mono);font-size:0.8rem;">T:0 B:0 L:0 R:0 | —</div></div>
+        <div class="field-group"><label class="field-label">Output</label><input type="text" id="cropOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly></div>
         <button class="btn btn-primary btn-full" id="cropProcess">✂️ Proses Crop &amp; Upscale</button>
-        <div class="progress-wrap" id="cropProgressWrap">
-          <div class="progress-bar"><div class="progress-fill" id="cropProgressFill"></div></div>
-          <div class="progress-label" id="cropProgressLabel"></div>
-        </div>
+        <div class="progress-wrap" id="cropProgressWrap"><div class="progress-bar"><div class="progress-fill" id="cropProgressFill"></div></div><div class="progress-label" id="cropProgressLabel"></div></div>
         <div class="log-box" id="cropLog"></div>
-
-        <!-- Tombol lanjut ke Video Loop -->
-        <div style="margin-top:16px;">
-          <button class="btn btn-secondary btn-full" id="cropToVideoBtn">▶ Lanjut ke Video Loop →</button>
-        </div>
-
+        <div style="margin-top:16px;"><button class="btn btn-secondary btn-full" id="cropToVideoBtn">▶ Lanjut ke Video Loop →</button></div>
       </div>
     </section>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- PANEL: Video Loop                                           -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- Video Loop -->
     <section class="tool-panel hidden" id="tool-video">
-      <div class="tool-header">
-        <h1 class="tool-title">Video Loop</h1>
-        <span class="tool-badge">Loop + XFade Seamless + Fade</span>
-      </div>
+      <div class="tool-header"><h1 class="tool-title">Video Loop</h1><span class="tool-badge">Loop + XFade Seamless + Fade</span></div>
       <div class="tool-body">
-
-        <!-- File input -->
-        <div class="field-group">
-          <label class="field-label">File Video</label>
-          <div class="file-row">
-            <input type="text" id="videoInput" class="file-input" placeholder="Pilih file video (atau dari hasil Crop)..." readonly>
-            <button class="btn btn-secondary" id="videoBrowse">Browse</button>
-          </div>
-          <div class="file-info" id="videoInfo"></div>
-        </div>
-
-        <!-- Durasi loop -->
+        <div class="field-group"><label class="field-label">File Video</label><div class="file-row"><input type="text" id="videoInput" class="file-input" placeholder="Pilih file video (atau dari hasil Crop)..." readonly><button class="btn btn-secondary" id="videoBrowse">Browse</button></div><div class="file-info" id="videoInfo"></div></div>
         <div class="field-group">
           <label class="field-label">Durasi Loop (detik)</label>
           <input type="number" id="videoDuration" class="input" value="3600" min="1">
@@ -198,79 +195,21 @@
             <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 10px;" onclick="document.getElementById('videoDuration').value=36000">10 Jam</button>
           </div>
         </div>
-
-        <!-- Fade In / Out -->
         <div class="collapsible-section">
-          <button class="section-toggle" id="toggleFade" aria-expanded="false">
-            <span class="section-title">🌅 Fade In / Fade Out</span>
-            <span class="section-summary" id="fadeSummary">OFF</span>
-            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
+          <button class="section-toggle" id="toggleFade" aria-expanded="false"><span class="section-title">🌅 Fade In / Fade Out</span><span class="section-summary" id="fadeSummary">OFF</span><svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
           <div class="section-body" id="fadeBody">
-            <div class="field-group" style="margin-top: 12px;">
-              <p class="field-hint">Diterapkan pada output final — hitam ke video (fade in) dan video ke hitam (fade out).</p>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
-                <div>
-                  <div class="checkbox-row" style="margin-bottom:8px;">
-                    <label class="checkbox-label"><input type="checkbox" id="videoFadeInEnabled"><span class="checkmark"></span>Fade In</label>
-                  </div>
-                  <div class="ctrl-field ctrl-off" id="fadeInControls">
-                    <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
-                    <input type="number" id="videoFadeInDuration" class="input" value="3" min="0.1" max="60" step="0.5">
-                  </div>
-                </div>
-                <div>
-                  <div class="checkbox-row" style="margin-bottom:8px;">
-                    <label class="checkbox-label"><input type="checkbox" id="videoFadeOutEnabled"><span class="checkmark"></span>Fade Out</label>
-                  </div>
-                  <div class="ctrl-field ctrl-off" id="fadeOutControls">
-                    <label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label>
-                    <input type="number" id="videoFadeOutDuration" class="input" value="3" min="0.1" max="60" step="0.5">
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div class="field-group" style="margin-top:12px;"><p class="field-hint">Diterapkan pada output final — hitam ke video (fade in) dan video ke hitam (fade out).</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;"><div><div class="checkbox-row" style="margin-bottom:8px;"><label class="checkbox-label"><input type="checkbox" id="videoFadeInEnabled"><span class="checkmark"></span>Fade In</label></div><div class="ctrl-field ctrl-off" id="fadeInControls"><label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label><input type="number" id="videoFadeInDuration" class="input" value="3" min="0.1" max="60" step="0.5"></div></div><div><div class="checkbox-row" style="margin-bottom:8px;"><label class="checkbox-label"><input type="checkbox" id="videoFadeOutEnabled"><span class="checkmark"></span>Fade Out</label></div><div class="ctrl-field ctrl-off" id="fadeOutControls"><label class="field-label" style="font-size:0.78rem;">Durasi <span style="opacity:.6">detik</span></label><input type="number" id="videoFadeOutDuration" class="input" value="3" min="0.1" max="60" step="0.5"></div></div></div></div>
           </div>
         </div>
-
-        <!-- XFade Loop -->
         <div class="collapsible-section">
-          <button class="section-toggle" id="toggleXfade" aria-expanded="false">
-            <span class="section-title">🔄 Loop Transition (XFade)</span>
-            <span class="section-summary" id="xfadeSummary">OFF</span>
-            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
+          <button class="section-toggle" id="toggleXfade" aria-expanded="false"><span class="section-title">🔄 Loop Transition (XFade)</span><span class="section-summary" id="xfadeSummary">OFF</span><svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
           <div class="section-body" id="xfadeBody">
-            <div class="field-group" style="margin-top: 12px;">
-              <p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa.</p>
-              <div class="checkbox-row" style="margin-bottom:12px;">
-                <label class="checkbox-label"><input type="checkbox" id="videoXfadeEnabled"><span class="checkmark"></span>Aktifkan XFade seamless loop</label>
-              </div>
-              <div class="ctrl-field ctrl-off" id="xfadeControls" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div class="field-group" style="margin-bottom:0;">
-                  <label class="field-label">Durasi XFade <span class="field-hint" style="display:inline;margin-left:4px;">detik</span></label>
-                  <input type="number" id="videoXfadeDuration" class="input" value="1.0" min="0.1" max="10" step="0.1">
-                  <p class="field-hint" style="margin-top:4px;">Rekomendasi ASMR: 0.5 – 1.5s</p>
-                </div>
-                <div class="field-group" style="margin-bottom:0;">
-                  <label class="field-label">Efek Transisi</label>
-                  <select id="videoXfadeType" class="input"><option value="fade" selected>Fade (smooth)</option></select>
-                  <p class="field-hint" style="margin-top:4px;">Membutuhkan re-encode penuh.</p>
-                </div>
-              </div>
-            </div>
+            <div class="field-group" style="margin-top:12px;"><p class="field-hint">Crossfade di titik loop agar sambungan tidak terasa.</p><div class="checkbox-row" style="margin-bottom:12px;"><label class="checkbox-label"><input type="checkbox" id="videoXfadeEnabled"><span class="checkmark"></span>Aktifkan XFade seamless loop</label></div><div class="ctrl-field ctrl-off" id="xfadeControls" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div class="field-group" style="margin-bottom:0;"><label class="field-label">Durasi XFade <span class="field-hint" style="display:inline;margin-left:4px;">detik</span></label><input type="number" id="videoXfadeDuration" class="input" value="1.0" min="0.1" max="10" step="0.1"><p class="field-hint" style="margin-top:4px;">Rekomendasi ASMR: 0.5 – 1.5s</p></div><div class="field-group" style="margin-bottom:0;"><label class="field-label">Efek Transisi</label><select id="videoXfadeType" class="input"><option value="fade" selected>Fade (smooth)</option></select><p class="field-hint" style="margin-top:4px;">Membutuhkan re-encode penuh.</p></div></div></div>
           </div>
         </div>
-
-        <!-- Opsi lain -->
         <div class="section-divider"></div>
-        <div class="checkbox-row">
-          <label class="checkbox-label"><input type="checkbox" id="videoKeepAudio"><span class="checkmark"></span>Pertahankan suara original video</label>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Output</label>
-          <input type="text" id="videoOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
-        </div>
+        <div class="checkbox-row"><label class="checkbox-label"><input type="checkbox" id="videoKeepAudio"><span class="checkmark"></span>Pertahankan suara original video</label></div>
+        <div class="field-group"><label class="field-label">Output</label><input type="text" id="videoOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly></div>
         <button class="btn btn-primary btn-full" id="videoProcess">▶ Proses Video Loop</button>
         <div class="progress-wrap" id="videoProgressWrap"><div class="progress-bar"><div class="progress-fill" id="videoProgressFill"></div></div><div class="progress-label" id="videoProgressLabel"></div></div>
         <div class="log-box" id="videoLog"></div>
@@ -290,24 +229,31 @@
       </div>
     </section>
 
-    <!-- Sound Layer -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- PANEL: Sound Layer                                          -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
     <section class="tool-panel hidden" id="tool-sound-layer">
       <div class="tool-header">
-        <h1 class="tool-title">Audio Mix &amp; Loop</h1>
-        <span class="tool-badge">Multiple Base Sounds + Layers</span>
+        <h1 class="tool-title">Audio Mix &amp; Layer</h1>
+        <span class="tool-badge">Base Sounds + Smart Optional Layers</span>
       </div>
       <div class="tool-body">
+
+        <!-- Main Sounds -->
         <div class="field-group">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <label class="field-label" style="margin-bottom:0;">Main Sounds (Base Layer)</label>
-            <button class="btn btn-ghost btn-add" id="soundLayerAddMainBtn" style="font-size:12px; padding:2px 8px;">+ Tambah Audio Utama (Maks 3)</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <label class="field-label" style="margin-bottom:0;">Main Sounds <span class="field-hint">(Base Layer, maks 3)</span></label>
+            <button class="btn btn-ghost btn-add" id="soundLayerAddMainBtn" style="font-size:12px;padding:2px 8px;">+ Tambah</button>
           </div>
-          <div id="soundLayerMainList" style="display:flex; flex-direction:column; gap:12px;"></div>
+          <div id="soundLayerMainList" style="display:flex;flex-direction:column;gap:12px;"></div>
         </div>
+
         <div class="section-divider"></div>
+
+        <!-- Output Settings -->
         <div class="controls-grid">
           <div class="field-group">
-            <label class="field-label">Target Durasi Output <span class="field-hint" id="soundLayerDurationLabel"></span></label>
+            <label class="field-label">Target Durasi Output</label>
             <input type="number" id="soundLayerTargetDuration" class="input" value="3600" min="1">
             <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;">
               <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 8px;" onclick="document.getElementById('soundLayerTargetDuration').value=3600;document.getElementById('soundLayerTargetDuration').dispatchEvent(new Event('input'))">1 Jam</button>
@@ -318,8 +264,8 @@
           <div class="field-group">
             <label class="field-label">Format Output</label>
             <select id="soundLayerOutputFormat" class="input">
-              <option value="aac" selected>AAC — Ukuran kecil, M4A format</option>
-              <option value="wav">WAV — Kualitas lossless, ukuran besar</option>
+              <option value="aac" selected>AAC — Ukuran kecil, M4A</option>
+              <option value="wav">WAV — Lossless, ukuran besar</option>
             </select>
           </div>
           <div class="field-group">
@@ -328,88 +274,36 @@
             <p class="field-hint">Detik. Transisi putar ulang.</p>
           </div>
         </div>
+
         <div class="section-divider"></div>
+
+        <!-- Optional Sounds -->
         <div class="field-group">
-          <div class="checkbox-row" style="margin-bottom:10px;">
-            <label class="checkbox-label"><input type="checkbox" id="soundLayerOptionalEnabled"><span class="checkmark"></span>Aktifkan Optional Sound Pool</label>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <label class="field-label" style="margin-bottom:0;">Optional Sounds <span class="field-hint">— tiap sound punya setting sendiri</span></label>
+            <button class="btn btn-ghost btn-add" id="optAddSoundBtn" style="font-size:12px;padding:2px 8px;">+ Tambah Sound</button>
           </div>
-          <div class="ctrl-field ctrl-off" id="optionalSoundControls">
-            <div style="display:flex;gap:16px;margin-bottom:12px;">
-              <label class="checkbox-label"><input type="radio" name="optionalMode" value="folder" checked><span class="checkmark" style="border-radius:50%"></span> Folder</label>
-              <label class="checkbox-label"><input type="radio" name="optionalMode" value="files"><span class="checkmark" style="border-radius:50%"></span> File Individual</label>
-            </div>
-            <div id="optionalFolderMode">
-              <label class="field-label">Optional Sound Pool Folder</label>
-              <div class="file-row">
-                <input type="text" id="soundLayerFolder" class="file-input" placeholder="Pilih folder berisi suara opsional..." readonly>
-                <button class="btn btn-secondary" id="soundLayerFolderBrowse">Browse Folder</button>
-              </div>
-              <div id="soundLayerPoolContainer" class="pool-container hidden">
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-                  <span>Pilih file untuk digunakan sebagai pool:</span>
-                  <div>
-                    <button class="btn btn-ghost btn-add" style="padding:2px 6px;font-size:10px;" id="soundLayerPoolAll">All</button>
-                    <button class="btn btn-ghost btn-add" style="padding:2px 6px;font-size:10px;margin-left:4px;" id="soundLayerPoolNone">None</button>
-                  </div>
-                </div>
-                <div id="soundLayerPoolList"></div>
-              </div>
-            </div>
-            <div id="optionalFilesMode" class="hidden">
-              <label class="field-label">File Audio Individual</label>
-              <div id="optionalIndividualFileList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-              <button class="btn btn-ghost btn-add" id="optionalAddFile">+ Tambah File Audio</button>
-            </div>
-          </div>
+          <div id="optSoundList" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <p class="field-hint" style="margin-top:8px;">Estimasi (~Nx) dihitung otomatis dari frekuensi, ukuran clip, dan window.</p>
         </div>
+
         <div class="section-divider"></div>
-        <div class="field-group">
-          <label class="field-label">Konfigurasi Penempatan (Randomization)</label>
-          <div class="controls-grid">
-            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Jumlah Kejadian (1 - 50)</label><input type="number" id="soundLayerOccurrences" class="input" value="10" min="1" max="50"></div>
-            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Gap Minimal Antar Suara (detik)</label><input type="number" id="soundLayerMinGap" class="input" value="5" min="0" step="0.5"></div>
-          </div>
-          <div class="checkbox-row" style="margin-top: 8px;">
-            <label class="checkbox-label"><input type="checkbox" id="soundLayerAllowOverlap"><span class="checkmark"></span>Izinkan Overlap Kejadian</label>
-          </div>
-          <div class="controls-grid" style="margin-top: 8px;">
-            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Window Start (%)</label><input type="number" id="soundLayerWindowStart" class="input" value="10" min="0" max="100"><p class="field-hint">Mulai muncul setelah x% durasi utama</p></div>
-            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Window End (%)</label><input type="number" id="soundLayerWindowEnd" class="input" value="90" min="0" max="100"><p class="field-hint">Berhenti sebelum y% durasi utama</p></div>
-          </div>
-          <div class="controls-grid" style="margin-top: 8px;">
-            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Min Durasi per Layer (detik)</label><input type="number" id="soundLayerMinDur" class="input" value="3" min="0.5" step="0.5"></div>
-            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Max Durasi per Layer (detik)</label><input type="number" id="soundLayerMaxDur" class="input" value="15" min="0.5" step="0.5"></div>
-          </div>
-        </div>
-        <div class="section-divider"></div>
+
+        <!-- Actions -->
+        <button class="btn btn-secondary btn-full" id="soundLayerPreviewPlanBtn" style="margin-bottom:10px;">🎲 Plan Layers</button>
         <div class="controls-grid">
-          <div class="field-group"><label class="field-label">Fade In Duration (detik)</label><input type="number" id="soundLayerFadeIn" class="input" value="1.5" min="0.1" step="0.1"></div>
-          <div class="field-group"><label class="field-label">Fade Out Duration (detik)</label><input type="number" id="soundLayerFadeOut" class="input" value="1.5" min="0.1" step="0.1"></div>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Silence Threshold (dBFS)</label>
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <input type="range" id="soundLayerSilenceThreshold" class="slider" min="-80" max="-10" value="-40" style="flex: 1;">
-            <span id="soundLayerSilenceThresholdVal" style="font-family: var(--font-mono); font-size: 13px; width: 45px; text-align: right;">-40 dB</span>
-          </div>
-          <p class="field-hint">Memotong keheningan di awal/akhir file opsional secara otomatis sebelum penempatan.</p>
-        </div>
-        <div class="section-divider"></div>
-        <div style="display:flex; gap:10px; margin-bottom: 12px;">
-          <button class="btn btn-secondary" id="soundLayerPreviewPlanBtn" style="flex:1;">🎲 Plan Layers</button>
-        </div>
-        <div class="controls-grid">
-          <button class="btn btn-secondary btn-full" id="soundLayerPreviewMixBtn" style="background-color: var(--primary-dark); color: white;">🔊 Preview Mix (15s)</button>
+          <button class="btn btn-secondary btn-full" id="soundLayerPreviewMixBtn" style="background-color:var(--primary-dark);color:white;">🔊 Preview Mix (15s)</button>
           <button class="btn btn-primary btn-full" id="soundLayerRenderBtn">▶ Render Full Output</button>
         </div>
+
         <div class="progress-wrap" id="soundLayerProgressWrap">
           <div class="progress-bar"><div class="progress-fill" id="soundLayerProgressFill"></div></div>
           <div class="progress-label" id="soundLayerProgressLabel"></div>
         </div>
         <div class="log-box" id="soundLayerLog"></div>
-        <div id="soundLayerPlayerContainer" class="thumb-preview" style="display: none; padding: 16px; background: var(--bg-card); flex-direction: column; gap: 10px; align-items: center; justify-content: center; border: 1px solid var(--border); margin-top: 16px;">
-          <div class="field-label" style="margin-bottom: 4px;">Hasil Render Layering</div>
-          <audio id="soundLayerAudioPlayer" controls style="width: 100%; outline: none;"></audio>
+        <div id="soundLayerPlayerContainer" class="thumb-preview" style="display:none;padding:16px;background:var(--bg-card);flex-direction:column;gap:10px;align-items:center;justify-content:center;border:1px solid var(--border);margin-top:16px;">
+          <div class="field-label" style="margin-bottom:4px;">Hasil Render Layering</div>
+          <audio id="soundLayerAudioPlayer" controls style="width:100%;outline:none;"></audio>
         </div>
       </div>
     </section>
@@ -432,13 +326,7 @@
       <div class="tool-header"><h1 class="tool-title">Merge</h1><span class="tool-badge">Video + Multi Audio</span></div>
       <div class="tool-body">
         <div class="field-group"><label class="field-label">File Video</label><div class="file-row"><input type="text" id="mergeVideo" class="file-input" placeholder="Dari Video Pipeline..." readonly><button class="btn btn-secondary" id="mergeVideoBrowse">Browse</button></div></div>
-        <div class="field-group">
-          <label class="field-label">Sumber Audio</label>
-          <div style="display:flex;gap:16px;margin-bottom:8px;">
-            <label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceManual" value="manual" checked><span class="checkmark" style="border-radius:50%"></span> Manual Layers</label>
-            <label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceLayer" value="layer"><span class="checkmark" style="border-radius:50%"></span> Sound Layer Output</label>
-          </div>
-        </div>
+        <div class="field-group"><label class="field-label">Sumber Audio</label><div style="display:flex;gap:16px;margin-bottom:8px;"><label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceManual" value="manual" checked><span class="checkmark" style="border-radius:50%"></span> Manual Layers</label><label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceLayer" value="layer"><span class="checkmark" style="border-radius:50%"></span> Sound Layer Output</label></div></div>
         <div class="field-group"><label class="field-label">Audio Layers <span class="hint">(max 4)</span></label><div id="audioLayers"></div><button class="btn btn-ghost btn-add" id="addAudioLayer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Tambah Audio</button></div>
         <div class="field-group"><label class="field-label">Output</label><input type="text" id="mergeOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly></div>
         <button class="btn btn-primary btn-full" id="mergeProcess">▶ Merge</button>
@@ -459,8 +347,8 @@
         <div class="thumb-preview" id="thumbPreview"></div>
       </div>
     </section>
-  </main>
 
+  </main>
   <div class="toast-container" id="toastContainer"></div>
 </div>
 <script type="module" src="/js/main.js"></script>
