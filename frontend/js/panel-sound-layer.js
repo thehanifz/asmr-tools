@@ -349,6 +349,25 @@ export function initSoundLayer() {
     btn.disabled = true;
     btn.textContent = '⏳ Rendering...';
 
+    // Update main sounds and placement volumes in the plan to match current state/UI
+    if (AppState.soundLayerPlan) {
+      AppState.soundLayerPlan.main_sounds = AppState.mainSounds.map(snd => ({
+        path: snd.path,
+        volume: snd.volume
+      }));
+
+      const optVolMap = {};
+      AppState.optionalSounds.forEach(s => {
+        optVolMap[s.path] = s.volume;
+      });
+
+      AppState.soundLayerPlan.placements.forEach(p => {
+        if (optVolMap[p.source_file] !== undefined) {
+          p.volume = optVolMap[p.source_file];
+        }
+      });
+    }
+
     const outFormat      = $('soundLayerOutputFormat').value || 'm4a';
     const loopXfade      = parseFloat($('soundLayerLoopXfade').value) || 2.0;
     const targetDuration = parseFloat($('soundLayerTargetDuration').value) || 3600;
