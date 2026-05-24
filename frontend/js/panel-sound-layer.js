@@ -282,7 +282,7 @@ export function initSoundLayer() {
 
     const targetDuration = parseFloat($('soundLayerTargetDuration').value) || 3600;
     const loopXfade      = parseFloat($('soundLayerLoopXfade').value) || 2.0;
-    const outFormat      = $('soundLayerOutputFormat').value || 'aac';
+    const outFormat      = $('soundLayerOutputFormat').value || 'm4a';
 
     const optional_sounds = AppState.optionalSounds.map(s => {
       const windowSec = ((s.window_end - s.window_start) / 100) * targetDuration;
@@ -349,9 +349,10 @@ export function initSoundLayer() {
     btn.disabled = true;
     btn.textContent = '⏳ Rendering...';
 
-    const outFormat      = $('soundLayerOutputFormat').value || 'aac';
+    const outFormat      = $('soundLayerOutputFormat').value || 'm4a';
     const loopXfade      = parseFloat($('soundLayerLoopXfade').value) || 2.0;
     const targetDuration = parseFloat($('soundLayerTargetDuration').value) || 3600;
+    const previewDuration = parseFloat($('soundLayerPreviewDuration')?.value) || 30.0;
 
     const payload = {
       plan: AppState.soundLayerPlan,
@@ -361,6 +362,7 @@ export function initSoundLayer() {
       output_format: outFormat,
       loop_xfade: loopXfade,
       target_duration: targetDuration,
+      preview_duration: previewDuration,
     };
 
     try {

@@ -264,7 +264,7 @@
           <div class="field-group">
             <label class="field-label">Format Output</label>
             <select id="soundLayerOutputFormat" class="input">
-              <option value="aac" selected>AAC — Ukuran kecil, M4A</option>
+              <option value="m4a" selected>AAC (M4A) — Ukuran kecil, didukung browser</option>
               <option value="wav">WAV — Lossless, ukuran besar</option>
             </select>
           </div>
@@ -292,7 +292,14 @@
         <!-- Actions -->
         <button class="btn btn-secondary btn-full" id="soundLayerPreviewPlanBtn" style="margin-bottom:10px;">🎲 Plan Layers</button>
         <div class="controls-grid">
-          <button class="btn btn-secondary btn-full" id="soundLayerPreviewMixBtn" style="background-color:var(--primary-dark);color:white;">🔊 Preview Mix (15s)</button>
+          <div style="display:flex;gap:6px;align-items:stretch;margin-top:4px;">
+            <button class="btn btn-secondary" id="soundLayerPreviewMixBtn" style="background-color:var(--primary-dark);color:white;flex:1;margin-top:0;padding:11px 4px;font-size:14px;">🔊 Preview Mix</button>
+            <select id="soundLayerPreviewDuration" class="input" style="width:85px;padding:9px 8px;font-size:13px;margin-top:0;">
+              <option value="30" selected>30s</option>
+              <option value="60">1m</option>
+              <option value="300">5m</option>
+            </select>
+          </div>
           <button class="btn btn-primary btn-full" id="soundLayerRenderBtn">▶ Render Full Output</button>
         </div>
 

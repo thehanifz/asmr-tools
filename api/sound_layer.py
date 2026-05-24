@@ -71,16 +71,14 @@ async def preview_placement(request: Request):
             engine.optional_sound_files = [path]
             plan = await engine.generate_placement_plan()
 
-            # Patch fade_in / fade_out individually per placement
+            # Patch fade_in / fade_out / volume individually per placement
             fi = float(snd.get("fade_in", 1.5))
             fo = float(snd.get("fade_out", 1.5))
             vol = int(snd.get("volume", 80))
             for p in plan.placements:
                 p.fade_in  = fi
                 p.fade_out = fo
-                # Store volume in trimmed_start field is not clean;
-                # use a custom attr via dict later when building final plan
-                p._volume = vol  # temporary attr
+                p.volume   = vol
 
             all_placements.extend(plan.placements)
 
@@ -98,10 +96,6 @@ async def preview_placement(request: Request):
 
         result = json.loads(merged.to_json())
 
-        # Inject volume into each placement for the renderer
-        for i, p in enumerate(all_placements):
-            result["placements"][i]["volume"] = getattr(p, '_volume', 80)
-
         return JSONResponse(result)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -117,6 +111,7 @@ async def render_mix(request: Request):
         output_format    = data.get("output_format", "aac").lower()
         loop_xfade       = float(data.get("loop_xfade", 2.0))
         target_duration  = float(data.get("target_duration", 3600.0))
+        preview_duration = float(data.get("preview_duration", 30.0))
         silence_threshold = -50.0  # hardcoded
 
         if not plan_data:
@@ -145,7 +140,9 @@ async def render_mix(request: Request):
             silence_threshold=silence_threshold,
         )
         engine = SoundLayerEngine(config)
-        cmd = engine.build_ffmpeg_command(plan, preview_mode=preview_mode)
+        cmd = engine.build_ffmpeg_command(plan, preview_mode=preview_mode, preview_duration=preview_duration)
+        print(f"[DEBUG RENDER] preview_mode={preview_mode}, target_duration={target_duration}, preview_duration={preview_duration}", flush=True)
+        print(f"[DEBUG CMD] {' '.join(cmd)}", flush=True)
 
         async def stream_render():
             import time

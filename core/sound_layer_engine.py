@@ -34,6 +34,7 @@ class Placement:
     fade_out: float
     trimmed_start: float = 0.0
     trimmed_end: float = 0.0
+    volume: int = 80
 
 
 @dataclass
@@ -830,7 +831,7 @@ class SoundLayerEngine:
         
         return plan
     
-    def build_ffmpeg_command(self, plan: PlacementPlan, preview_mode: bool = False) -> list:
+    def build_ffmpeg_command(self, plan: PlacementPlan, preview_mode: bool = False, preview_duration: float = 30.0) -> list:
         """
         Build FFmpeg command from placement plan.
         
@@ -886,7 +887,7 @@ class SoundLayerEngine:
         # Apply preview mode constraint
         target_dur = self.config.target_duration
         if preview_mode:
-            target_dur = min(target_dur, 15.0)
+            target_dur = min(target_dur, preview_duration)
             
         xfade = min(self.config.loop_xfade, target_dur * 0.4)
             
@@ -943,9 +944,10 @@ class SoundLayerEngine:
             fade_out_start = placement.duration - placement.fade_out
             filter_chain += f"afade=t=out:st={fade_out_start}:d={placement.fade_out}"
             
-            # Apply volume normalization if needed
-            if volume_factor < 1.0:
-                filter_chain += f",volume={volume_factor}"
+            # Apply volume (user setting * overlap normalization factor)
+            vol_val = (placement.volume / 100.0) * volume_factor
+            if vol_val != 1.0:
+                filter_chain += f",volume={vol_val:.3f}"
             
             filter_chain += f"[{label}]"
             filter_parts.append(filter_chain)
