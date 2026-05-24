@@ -1,13 +1,13 @@
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  Panel: Sound Layer — Per-Sound Smart Density
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 import { AppState, setWorkspace } from './state.js';
 import { browseAudio, probeFile, previewSoundLayer } from './api.js';
 import { toast, logClear, logAppend, consumeSSE } from './ui.js';
 
 function $(id) { return document.getElementById(id); }
 
-// ── Density & ClipSize maps ───────────────────
+// ── Density & ClipSize maps ──────────────────────────────────
 const DENSITY_SPACING = { sparse: 8, normal: 4, dense: 2, vdense: 1.2 };
 const CLIP_RANGE = {
   short:  { min: 3,  max: 8  },
@@ -16,13 +16,14 @@ const CLIP_RANGE = {
 };
 
 function calcOccurrences(windowSec, density, clipSize) {
-  const avg = (CLIP_RANGE[clipSize].min + CLIP_RANGE[clipSize].max) / 2;
-  const spacing = avg * DENSITY_SPACING[density];
+  const range = CLIP_RANGE[clipSize] || CLIP_RANGE.medium;
+  const avg = (range.min + range.max) / 2;
+  const spacing = avg * (DENSITY_SPACING[density] || 4);
   return Math.max(1, Math.floor(windowSec / spacing));
 }
 
-// ── Per-Sound Item Builder ────────────────────
-function buildSoundItem(sound, idx, onRemove, onUpdate) {
+// ── Per-Sound Item Builder ───────────────────────────────────
+function buildSoundItem(sound, idx, onRemove) {
   const div = document.createElement('div');
   div.className = 'opt-sound-item';
   div.dataset.idx = idx;
@@ -36,8 +37,8 @@ function buildSoundItem(sound, idx, onRemove, onUpdate) {
       </button>
       <span class="opt-sound-name" title="${sound.path}">🎵 ${name}</span>
       <span class="opt-sound-dur">${sound.duration > 0 ? sound.duration.toFixed(1) + 's' : ''}</span>
-      <span class="opt-sound-est" data-idx="${idx}"></span>
-      <button class="btn btn-ghost opt-remove-btn" title="Hapus" data-idx="${idx}" style="color:var(--danger);padding:2px 6px;margin-left:4px;">×</button>
+      <span class="opt-sound-est" id="optEst_${idx}"></span>
+      <button class="btn btn-ghost opt-remove-btn" title="Hapus" style="color:var(--danger);padding:2px 6px;margin-left:4px;">×</button>
     </div>
     <div class="opt-sound-body collapsed">
       <!-- Volume -->
@@ -50,7 +51,7 @@ function buildSoundItem(sound, idx, onRemove, onUpdate) {
       <div class="opt-row">
         <label class="opt-label">Fade In</label>
         <input type="number" class="input opt-fadein" value="${sound.fade_in}" min="0.1" max="10" step="0.1" style="width:70px;">
-        <span class="opt-label" style="margin-left:12px;">Fade Out</span>
+        <label class="opt-label" style="margin-left:12px;">Fade Out</label>
         <input type="number" class="input opt-fadeout" value="${sound.fade_out}" min="0.1" max="10" step="0.1" style="width:70px;">
         <span class="opt-unit">detik</span>
       </div>
@@ -58,35 +59,34 @@ function buildSoundItem(sound, idx, onRemove, onUpdate) {
       <div class="opt-row">
         <label class="opt-label">Frekuensi</label>
         <div class="opt-radio-group">
-          ${['sparse:Jarang','normal:Normal','dense:Padat','vdense:Sangat Padat'].map(s => {
-            const [val, lbl] = s.split(':');
-            return `<label class="opt-radio-lbl"><input type="radio" name="density_${idx}" value="${val}" ${sound.density===val?'checked':''}> ${lbl}</label>`;
-          }).join('')}
+          <label class="opt-radio-lbl"><input type="radio" name="density_${idx}" value="sparse" ${sound.density==='sparse'?'checked':''}> Jarang</label>
+          <label class="opt-radio-lbl"><input type="radio" name="density_${idx}" value="normal" ${sound.density==='normal'?'checked':''}> Normal</label>
+          <label class="opt-radio-lbl"><input type="radio" name="density_${idx}" value="dense" ${sound.density==='dense'?'checked':''}> Padat</label>
+          <label class="opt-radio-lbl"><input type="radio" name="density_${idx}" value="vdense" ${sound.density==='vdense'?'checked':''}> Sangat Padat</label>
         </div>
       </div>
       <!-- Ukuran Clip -->
       <div class="opt-row">
         <label class="opt-label">Ukuran Clip</label>
         <div class="opt-radio-group">
-          ${['short:Pendek','medium:Sedang','long:Panjang'].map(s => {
-            const [val, lbl] = s.split(':');
-            return `<label class="opt-radio-lbl"><input type="radio" name="clip_${idx}" value="${val}" ${sound.clip_size===val?'checked':''}> ${lbl}</label>`;
-          }).join('')}
+          <label class="opt-radio-lbl"><input type="radio" name="clip_${idx}" value="short" ${sound.clip_size==='short'?'checked':''}> Pendek (3-8s)</label>
+          <label class="opt-radio-lbl"><input type="radio" name="clip_${idx}" value="medium" ${sound.clip_size==='medium'?'checked':''}> Sedang (8-20s)</label>
+          <label class="opt-radio-lbl"><input type="radio" name="clip_${idx}" value="long" ${sound.clip_size==='long'?'checked':''}> Panjang (20-45s)</label>
         </div>
       </div>
       <!-- Window -->
       <div class="opt-row">
         <label class="opt-label">Window</label>
-        <input type="number" class="input opt-wstart" value="${sound.window_start}" min="0" max="100" step="5" style="width:60px;"> %
+        <input type="number" class="input opt-wstart" value="${sound.window_start}" min="0" max="100" step="5" style="width:64px;"> %
         <span style="margin:0 6px;opacity:.5;">s/d</span>
-        <input type="number" class="input opt-wend" value="${sound.window_end}" min="0" max="100" step="5" style="width:60px;"> %
+        <input type="number" class="input opt-wend" value="${sound.window_end}" min="0" max="100" step="5" style="width:64px;"> %
       </div>
     </div>
   `;
 
   // Expand / Collapse
-  const header = div.querySelector('.opt-sound-header');
-  const body   = div.querySelector('.opt-sound-body');
+  const header  = div.querySelector('.opt-sound-header');
+  const body    = div.querySelector('.opt-sound-body');
   const chevron = div.querySelector('.opt-chevron');
   header.addEventListener('click', (e) => {
     if (e.target.closest('.opt-remove-btn')) return;
@@ -95,39 +95,41 @@ function buildSoundItem(sound, idx, onRemove, onUpdate) {
   });
 
   // Remove
-  div.querySelector('.opt-remove-btn').addEventListener('click', () => onRemove(idx));
+  div.querySelector('.opt-remove-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    onRemove(parseInt(div.dataset.idx));
+  });
 
-  // Live update helpers
-  function read() {
-    const density  = div.querySelector(`input[name="density_${idx}"]:checked`)?.value || 'normal';
+  // Sync helpers
+  function getState() {
+    const density   = div.querySelector(`input[name="density_${idx}"]:checked`)?.value || 'normal';
     const clip_size = div.querySelector(`input[name="clip_${idx}"]:checked`)?.value || 'medium';
-    const wStart   = parseFloat(div.querySelector('.opt-wstart').value) || 0;
-    const wEnd     = parseFloat(div.querySelector('.opt-wend').value) || 100;
+    const wStart    = parseFloat(div.querySelector('.opt-wstart').value) || 0;
+    const wEnd      = parseFloat(div.querySelector('.opt-wend').value)   || 100;
     return { density, clip_size, wStart, wEnd };
   }
 
   function updateEst() {
     const targetDur = parseFloat($('soundLayerTargetDuration')?.value) || 3600;
-    const { density, clip_size, wStart, wEnd } = read();
+    const { density, clip_size, wStart, wEnd } = getState();
     const windowSec = ((wEnd - wStart) / 100) * targetDur;
     const occ = calcOccurrences(windowSec, density, clip_size);
-    const est = div.querySelector(`.opt-sound-est`);
+    const est = $(`optEst_${idx}`);
     if (est) est.textContent = `~${occ}x`;
   }
 
-  function syncState() {
+  function syncToState() {
     const s = AppState.optionalSounds[parseInt(div.dataset.idx)];
     if (!s) return;
-    const { density, clip_size, wStart, wEnd } = read();
-    s.density      = density;
-    s.clip_size    = clip_size;
-    s.window_start = wStart;
-    s.window_end   = wEnd;
-    s.volume = parseInt(div.querySelector('.opt-volume').value);
-    s.fade_in  = parseFloat(div.querySelector('.opt-fadein').value);
-    s.fade_out = parseFloat(div.querySelector('.opt-fadeout').value);
+    const { density, clip_size, wStart, wEnd } = getState();
+    s.density       = density;
+    s.clip_size     = clip_size;
+    s.window_start  = wStart;
+    s.window_end    = wEnd;
+    s.volume    = parseInt(div.querySelector('.opt-volume').value);
+    s.fade_in   = parseFloat(div.querySelector('.opt-fadein').value);
+    s.fade_out  = parseFloat(div.querySelector('.opt-fadeout').value);
     updateEst();
-    if (onUpdate) onUpdate();
   }
 
   // Volume display
@@ -135,45 +137,47 @@ function buildSoundItem(sound, idx, onRemove, onUpdate) {
   const volVal    = div.querySelector('.opt-vol-val');
   volSlider.addEventListener('input', () => {
     volVal.textContent = volSlider.value + '%';
-    syncState();
+    syncToState();
   });
 
   div.querySelectorAll('.opt-fadein, .opt-fadeout, .opt-wstart, .opt-wend').forEach(el => {
-    el.addEventListener('input', syncState);
+    el.addEventListener('input', syncToState);
   });
   div.querySelectorAll(`input[name^="density_"], input[name^="clip_"]`).forEach(el => {
-    el.addEventListener('change', syncState);
+    el.addEventListener('change', syncToState);
   });
 
   updateEst();
   return div;
 }
 
-// ── Render list ──────────────────────────────
+// ── Render optional list ─────────────────────────────────────
 function renderOptionalList() {
   const list = $('optSoundList');
   if (!list) return;
   list.innerHTML = '';
   AppState.optionalSounds.forEach((s, idx) => {
-    const el = buildSoundItem(s, idx,
-      (i) => { AppState.optionalSounds.splice(i, 1); renderOptionalList(); },
-      null
-    );
+    const el = buildSoundItem(s, idx, (i) => {
+      AppState.optionalSounds.splice(i, 1);
+      renderOptionalList();
+    });
     list.appendChild(el);
   });
 }
 
-// ── Main init ────────────────────────────────
+// ── Main init ────────────────────────────────────────────────
 export function initSoundLayer() {
 
-  // Main sounds list
-  AppState.mainSounds = [];
+  // ── Main sounds ──────────────────────────────────────────────
+  AppState.mainSounds = AppState.mainSounds || [];
 
   function renderMainSoundsList() {
     const list = $('soundLayerMainList');
     if (!list) return;
     list.innerHTML = '';
-    $('soundLayerAddMainBtn').disabled = AppState.mainSounds.length >= 3;
+    const addBtn = $('soundLayerAddMainBtn');
+    if (addBtn) addBtn.disabled = AppState.mainSounds.length >= 3;
+
     AppState.mainSounds.forEach((snd, idx) => {
       const div = document.createElement('div');
       div.className = 'file-row';
@@ -190,7 +194,7 @@ export function initSoundLayer() {
         </div>
       `;
       div.querySelector('.btn-ghost').addEventListener('click', (e) => {
-        AppState.mainSounds.splice(parseInt(e.target.dataset.idx), 1);
+        AppState.mainSounds.splice(parseInt(e.currentTarget.dataset.idx), 1);
         renderMainSoundsList();
       });
       const vs = div.querySelector('.vol-slider');
@@ -203,7 +207,7 @@ export function initSoundLayer() {
     });
   }
 
-  $('soundLayerAddMainBtn').addEventListener('click', async () => {
+  $('soundLayerAddMainBtn')?.addEventListener('click', async () => {
     if (AppState.mainSounds.length >= 3) return;
     try {
       const path = await browseAudio();
@@ -216,15 +220,18 @@ export function initSoundLayer() {
     }
   });
 
-  // Optional sounds init
-  AppState.optionalSounds = [];
+  // ── Optional sounds ──────────────────────────────────────────
+  AppState.optionalSounds = AppState.optionalSounds || [];
 
   $('optAddSoundBtn')?.addEventListener('click', async () => {
     try {
       const path = await browseAudio();
       if (!path) return;
-      const probe = await probeFile(path);
-      const dur   = probe?.duration ?? 0;
+      let dur = 0;
+      try {
+        const probe = await probeFile(path);
+        dur = probe?.duration ?? 0;
+      } catch (_) {}
       AppState.optionalSounds.push({
         path,
         duration: dur,
@@ -244,25 +251,30 @@ export function initSoundLayer() {
 
   // Re-compute estimates saat target duration berubah
   $('soundLayerTargetDuration')?.addEventListener('input', () => {
-    document.querySelectorAll('.opt-sound-item').forEach((el, idx) => {
-      const s = AppState.optionalSounds[idx];
-      if (!s) return;
-      const density  = el.querySelector(`input[name="density_${idx}"]:checked`)?.value || 'normal';
+    AppState.optionalSounds.forEach((_, idx) => {
+      const el = $('optSoundList')?.children[idx];
+      if (!el) return;
+      const density   = el.querySelector(`input[name="density_${idx}"]:checked`)?.value || 'normal';
       const clip_size = el.querySelector(`input[name="clip_${idx}"]:checked`)?.value || 'medium';
-      const wStart   = parseFloat(el.querySelector('.opt-wstart')?.value) || 0;
-      const wEnd     = parseFloat(el.querySelector('.opt-wend')?.value) || 100;
+      const wStart    = parseFloat(el.querySelector('.opt-wstart')?.value) || 0;
+      const wEnd      = parseFloat(el.querySelector('.opt-wend')?.value)   || 100;
       const targetDur = parseFloat($('soundLayerTargetDuration')?.value) || 3600;
       const windowSec = ((wEnd - wStart) / 100) * targetDur;
-      const occ = calcOccurrences(windowSec, density, clip_size);
-      const est = el.querySelector('.opt-sound-est');
-      if (est) est.textContent = `~${occ}x`;
+      const est = $(`optEst_${idx}`);
+      if (est) est.textContent = `~${calcOccurrences(windowSec, density, clip_size)}x`;
     });
   });
 
-  // ── Plan Layers ──────────────────────────────
-  $('soundLayerPreviewPlanBtn').addEventListener('click', async () => {
-    if (AppState.mainSounds.length === 0) { toast('Pilih minimal 1 main sound', 'error'); return; }
-    if (AppState.optionalSounds.length === 0) { toast('Tambah minimal 1 optional sound', 'error'); return; }
+  // ── Plan Layers ──────────────────────────────────────────────
+  $('soundLayerPreviewPlanBtn')?.addEventListener('click', async () => {
+    if (AppState.mainSounds.length === 0) {
+      toast('Pilih minimal 1 main sound', 'error');
+      return;
+    }
+    if (!AppState.optionalSounds || AppState.optionalSounds.length === 0) {
+      toast('Tambah minimal 1 optional sound', 'error');
+      return;
+    }
 
     logClear('soundLayerLog');
     logAppend('soundLayerLog', 'Membuat rencana penempatan...');
@@ -271,22 +283,18 @@ export function initSoundLayer() {
     const loopXfade      = parseFloat($('soundLayerLoopXfade').value) || 2.0;
     const outFormat      = $('soundLayerOutputFormat').value || 'aac';
 
-    // Build per-sound payload
     const optional_sounds = AppState.optionalSounds.map(s => {
-      const wStart = s.window_start;
-      const wEnd   = s.window_end;
-      const windowSec = ((wEnd - wStart) / 100) * targetDuration;
-      const occurrence_count = calcOccurrences(windowSec, s.density, s.clip_size);
+      const windowSec = ((s.window_end - s.window_start) / 100) * targetDuration;
       return {
         path: s.path,
         volume: s.volume,
         fade_in: s.fade_in,
         fade_out: s.fade_out,
-        occurrence_count,
+        occurrence_count: calcOccurrences(windowSec, s.density, s.clip_size),
         min_duration: CLIP_RANGE[s.clip_size].min,
         max_duration: CLIP_RANGE[s.clip_size].max,
-        time_window_start: (wStart / 100) * targetDuration,
-        time_window_end:   (wEnd   / 100) * targetDuration,
+        time_window_start: (s.window_start / 100) * targetDuration,
+        time_window_end:   (s.window_end   / 100) * targetDuration,
         min_gap: 0,
         overlap_mode: 'full',
       };
@@ -300,17 +308,15 @@ export function initSoundLayer() {
       output_format: outFormat,
     };
 
+    const btn = $('soundLayerPreviewPlanBtn');
+    btn.disabled = true;
     try {
-      $('soundLayerPreviewPlanBtn').disabled = true;
       const res = await previewSoundLayer(payload);
-      $('soundLayerPreviewPlanBtn').disabled = false;
-
       if (res.error) {
         toast('Gagal membuat plan: ' + res.error, 'error');
         logAppend('soundLayerLog', `✗ Error: ${res.error}`, 'error');
         return;
       }
-
       AppState.soundLayerPlan = res;
       logClear('soundLayerLog');
       logAppend('soundLayerLog', `✓ Plan berhasil — ${res.placements.length} penempatan`, 'done');
@@ -320,28 +326,30 @@ export function initSoundLayer() {
       });
       toast('Plan berhasil dibuat. Siap render!', 'success');
     } catch (e) {
-      $('soundLayerPreviewPlanBtn').disabled = false;
       logAppend('soundLayerLog', `✗ Error: ${e.message}`, 'error');
       toast('Plan error: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
     }
   });
 
-  // ── Preview Mix ──────────────────────────────
-  $('soundLayerPreviewMixBtn').addEventListener('click', () => doRender(true));
-  $('soundLayerRenderBtn').addEventListener('click', () => doRender(false));
+  // ── Preview & Render ─────────────────────────────────────────
+  $('soundLayerPreviewMixBtn')?.addEventListener('click', () => doRender(true));
+  $('soundLayerRenderBtn')?.addEventListener('click', () => doRender(false));
 
   async function doRender(isPreview) {
     if (!AppState.soundLayerPlan) {
       toast("Klik 'Plan Layers' dahulu", 'warning');
       return;
     }
-    const btn = isPreview ? $('soundLayerPreviewMixBtn') : $('soundLayerRenderBtn');
+
+    const btn  = isPreview ? $('soundLayerPreviewMixBtn') : $('soundLayerRenderBtn');
     const orig = btn.textContent;
     btn.disabled = true;
     btn.textContent = '⏳ Rendering...';
 
-    const outFormat     = $('soundLayerOutputFormat').value || 'aac';
-    const loopXfade     = parseFloat($('soundLayerLoopXfade').value) || 2.0;
+    const outFormat      = $('soundLayerOutputFormat').value || 'aac';
+    const loopXfade      = parseFloat($('soundLayerLoopXfade').value) || 2.0;
     const targetDuration = parseFloat($('soundLayerTargetDuration').value) || 3600;
 
     const payload = {
@@ -354,33 +362,28 @@ export function initSoundLayer() {
       target_duration: targetDuration,
     };
 
-    logClear('soundLayerLog');
-    logAppend('soundLayerLog', isPreview ? 'Rendering preview 15s...' : 'Rendering full mix...');
-
     try {
-      const prog = $('soundLayerProgressWrap');
-      const fill = $('soundLayerProgressFill');
-      const lbl  = $('soundLayerProgressLabel');
-      if (prog) prog.style.display = 'block';
+      const result = await consumeSSE(
+        '/api/sound-layer/render',
+        payload,
+        'soundLayerLog',
+        'soundLayerProgressWrap',
+        'soundLayerProgressFill',
+        'soundLayerProgressLabel'
+      );
 
-      await consumeSSE('/api/sound-layer/render', payload, {
-        onLog:      (msg) => logAppend('soundLayerLog', msg),
-        onProgress: (pct) => { if (fill) fill.style.width = pct + '%'; if (lbl) lbl.textContent = pct + '%'; },
-        onDone:     (data) => {
-          logAppend('soundLayerLog', `✓ Selesai → ${data.output}`, 'done');
-          toast('Render selesai!', 'success');
-          if (isPreview && data.output) {
-            const player = $('soundLayerPlayerContainer');
-            const audio  = $('soundLayerAudioPlayer');
-            if (player && audio) {
-              player.style.display = 'flex';
-              audio.src = `/api/sound-layer/play?path=${encodeURIComponent(data.output)}&t=${Date.now()}`;
-              audio.play();
-            }
+      if (result.ok && result.finalData?.output) {
+        toast('Render selesai!', 'success');
+        if (isPreview) {
+          const player = $('soundLayerPlayerContainer');
+          const audio  = $('soundLayerAudioPlayer');
+          if (player && audio) {
+            player.style.display = 'flex';
+            audio.src = `/api/sound-layer/play?path=${encodeURIComponent(result.finalData.output)}&t=${Date.now()}`;
+            audio.play();
           }
-        },
-        onError: (msg) => { logAppend('soundLayerLog', `✗ ${msg}`, 'error'); toast(msg, 'error'); }
-      });
+        }
+      }
     } catch (e) {
       logAppend('soundLayerLog', `✗ ${e.message}`, 'error');
       toast(e.message, 'error');
