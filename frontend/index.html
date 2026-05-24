@@ -24,13 +24,64 @@
       <span class="sidebar-logo-text">ASMR Tools</span>
     </div>
     <nav class="sidebar-nav">
-      <button class="nav-item active" data-tool="video"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="16" height="16" rx="2"/><polygon points="22,4 22,20 16,12"/></svg><span>Video</span></button>
-      <button class="nav-item" data-tool="extract"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg><span>Extract</span></button>
-
-      <button class="nav-item" data-tool="sound-layer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>Sound Layer</span></button>
-      <button class="nav-item" data-tool="denoise"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Denoise</span></button>
-      <button class="nav-item" data-tool="merge"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>Merge</span></button>
-      <button class="nav-item" data-tool="thumbnail"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg><span>Thumbnail</span></button>
+      <!-- Crop & Upscale -->
+      <button class="nav-item active" data-tool="crop">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <polyline points="6 2 6 8 2 8"/><polyline points="18 22 18 16 22 16"/>
+          <path d="M6 8H22"/><path d="M2 16H18"/>
+        </svg>
+        <span>Crop</span>
+      </button>
+      <!-- Video Loop -->
+      <button class="nav-item" data-tool="video">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="2" y="4" width="16" height="16" rx="2"/>
+          <polygon points="22,4 22,20 16,12"/>
+        </svg>
+        <span>Video Loop</span>
+      </button>
+      <!-- Extract -->
+      <button class="nav-item" data-tool="extract">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+        </svg>
+        <span>Extract</span>
+      </button>
+      <!-- Sound Layer -->
+      <button class="nav-item" data-tool="sound-layer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <span>Sound Layer</span>
+      </button>
+      <!-- Denoise -->
+      <button class="nav-item" data-tool="denoise">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>Denoise</span>
+      </button>
+      <!-- Merge -->
+      <button class="nav-item" data-tool="merge">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/>
+          <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/>
+          <line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        <span>Merge</span>
+      </button>
+      <!-- Thumbnail -->
+      <button class="nav-item" data-tool="thumbnail">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21,15 16,10 5,21"/>
+        </svg>
+        <span>Thumbnail</span>
+      </button>
     </nav>
     <div class="sidebar-cleanup">
       <button class="btn-cleanup" id="btnAutoCleanup" title="Hapus semua file temporary (_tmp_*) di workspace">
@@ -48,10 +99,14 @@
   </aside>
 
   <main class="workspace">
-    <section class="tool-panel" id="tool-video">
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- PANEL: Crop & Upscale                                       -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="tool-panel" id="tool-crop">
       <div class="tool-header">
-        <h1 class="tool-title">Video Pipeline</h1>
-        <span class="tool-badge">Crop → Upscale → Loop</span>
+        <h1 class="tool-title">Crop &amp; Upscale</h1>
+        <span class="tool-badge">Potong tepi + Rescale resolusi</span>
       </div>
       <div class="tool-body">
 
@@ -59,36 +114,88 @@
         <div class="field-group">
           <label class="field-label">File Video</label>
           <div class="file-row">
-            <input type="text" id="videoInput" class="file-input" placeholder="Pilih file video..." readonly>
+            <input type="text" id="cropInput" class="file-input" placeholder="Pilih file video..." readonly>
+            <button class="btn btn-secondary" id="cropBrowse">Browse</button>
+          </div>
+          <div class="file-info" id="cropInfo"></div>
+        </div>
+
+        <!-- Crop controls -->
+        <div class="controls-grid">
+          <div class="field-group"><label class="field-label">Crop Atas (px)</label><input type="number" id="cropPanelTop" class="input" value="0" min="0"></div>
+          <div class="field-group"><label class="field-label">Crop Bawah (px)</label><input type="number" id="cropPanelBottom" class="input" value="0" min="0"></div>
+          <div class="field-group"><label class="field-label">Crop Kiri (px)</label><input type="number" id="cropPanelLeft" class="input" value="0" min="0"></div>
+          <div class="field-group"><label class="field-label">Crop Kanan (px)</label><input type="number" id="cropPanelRight" class="input" value="0" min="0"></div>
+          <div class="field-group">
+            <label class="field-label">Upscale Resolusi</label>
+            <select id="cropUpscaleRes" class="input">
+              <option value="">— Skip —</option>
+              <option value="1920:1080">FHD 1920×1080</option>
+              <option value="2560:1440">QHD 2560×1440</option>
+              <option value="3840:2160">4K 3840×2160</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">CRF Quality <span class="field-hint">(18=terbaik, 28=kecil)</span></label>
+            <input type="number" id="cropCrf" class="input" value="23" min="12" max="35">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Summary</label>
+          <div class="field-hint" id="cropPanelSummary" style="font-family:var(--font-mono);font-size:0.8rem;">T:0 B:0 L:0 R:0 | —</div>
+        </div>
+
+        <!-- Output -->
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="cropOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="cropProcess">✂️ Proses Crop &amp; Upscale</button>
+        <div class="progress-wrap" id="cropProgressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="cropProgressFill"></div></div>
+          <div class="progress-label" id="cropProgressLabel"></div>
+        </div>
+        <div class="log-box" id="cropLog"></div>
+
+        <!-- Tombol lanjut ke Video Loop -->
+        <div style="margin-top:16px;">
+          <button class="btn btn-secondary btn-full" id="cropToVideoBtn">▶ Lanjut ke Video Loop →</button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- PANEL: Video Loop                                           -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="tool-panel hidden" id="tool-video">
+      <div class="tool-header">
+        <h1 class="tool-title">Video Loop</h1>
+        <span class="tool-badge">Loop + XFade Seamless + Fade</span>
+      </div>
+      <div class="tool-body">
+
+        <!-- File input -->
+        <div class="field-group">
+          <label class="field-label">File Video</label>
+          <div class="file-row">
+            <input type="text" id="videoInput" class="file-input" placeholder="Pilih file video (atau dari hasil Crop)..." readonly>
             <button class="btn btn-secondary" id="videoBrowse">Browse</button>
           </div>
           <div class="file-info" id="videoInfo"></div>
         </div>
 
-        <!-- Crop + Upscale -->
-        <div class="collapsible-section">
-          <button class="section-toggle" id="toggleCrop" aria-expanded="true">
-            <span class="section-title">✂ Crop &amp; Upscale</span>
-            <span class="section-summary" id="cropSummary">T:0 B:0 L:0 R:0 | —</span>
-            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="section-body open" id="cropBody">
-            <div class="controls-grid" style="margin-top: 12px;">
-              <div class="field-group"><label class="field-label">Crop Atas (px)</label><input type="number" id="cropTop" class="input" value="0" min="0"></div>
-              <div class="field-group"><label class="field-label">Crop Bawah (px)</label><input type="number" id="cropBottom" class="input" value="0" min="0"></div>
-              <div class="field-group"><label class="field-label">Crop Kiri (px)</label><input type="number" id="cropLeft" class="input" value="0" min="0"></div>
-              <div class="field-group"><label class="field-label">Crop Kanan (px)</label><input type="number" id="cropRight" class="input" value="0" min="0"></div>
-              <div class="field-group">
-                <label class="field-label">Upscale</label>
-                <select id="upscaleRes" class="input">
-                  <option value="">— Skip —</option>
-                  <option value="1920:1080">FHD 1920×1080</option>
-                  <option value="2560:1440">QHD 2560×1440</option>
-                  <option value="3840:2160">4K 3840×2160</option>
-                </select>
-              </div>
-              <div class="field-group"><label class="field-label">Durasi Loop (detik)</label><input type="number" id="videoDuration" class="input" value="3600" min="1"></div>
-            </div>
+        <!-- Durasi loop -->
+        <div class="field-group">
+          <label class="field-label">Durasi Loop (detik)</label>
+          <input type="number" id="videoDuration" class="input" value="3600" min="1">
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 10px;" onclick="document.getElementById('videoDuration').value=3600">1 Jam</button>
+            <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 10px;" onclick="document.getElementById('videoDuration').value=10800">3 Jam</button>
+            <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 10px;" onclick="document.getElementById('videoDuration').value=28800">8 Jam</button>
+            <button class="btn btn-ghost" style="font-size:0.75rem;padding:4px 10px;" onclick="document.getElementById('videoDuration').value=36000">10 Jam</button>
           </div>
         </div>
 
@@ -164,7 +271,7 @@
           <label class="field-label">Output</label>
           <input type="text" id="videoOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
         </div>
-        <button class="btn btn-primary btn-full" id="videoProcess">▶ Proses Video</button>
+        <button class="btn btn-primary btn-full" id="videoProcess">▶ Proses Video Loop</button>
         <div class="progress-wrap" id="videoProgressWrap"><div class="progress-bar"><div class="progress-fill" id="videoProgressFill"></div></div><div class="progress-label" id="videoProgressLabel"></div></div>
         <div class="log-box" id="videoLog"></div>
       </div>
@@ -183,28 +290,20 @@
       </div>
     </section>
 
-
-
     <!-- Sound Layer -->
     <section class="tool-panel hidden" id="tool-sound-layer">
       <div class="tool-header">
-        <h1 class="tool-title">Audio Mix & Loop</h1>
+        <h1 class="tool-title">Audio Mix &amp; Loop</h1>
         <span class="tool-badge">Multiple Base Sounds + Layers</span>
       </div>
       <div class="tool-body">
-        
-        <!-- Main Sound Selection -->
         <div class="field-group">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <label class="field-label" style="margin-bottom:0;">Main Sounds (Base Layer)</label>
             <button class="btn btn-ghost btn-add" id="soundLayerAddMainBtn" style="font-size:12px; padding:2px 8px;">+ Tambah Audio Utama (Maks 3)</button>
           </div>
-          <div id="soundLayerMainList" style="display:flex; flex-direction:column; gap:12px;">
-            <!-- Dinamis diisi lewat panel-sound-layer.js -->
-          </div>
+          <div id="soundLayerMainList" style="display:flex; flex-direction:column; gap:12px;"></div>
         </div>
-
-        <!-- Durasi + Format + XFade -->
         <div class="section-divider"></div>
         <div class="controls-grid">
           <div class="field-group">
@@ -229,121 +328,64 @@
             <p class="field-hint">Detik. Transisi putar ulang.</p>
           </div>
         </div>
-
-        <!-- Optional Sound Pool Selection -->
         <div class="section-divider"></div>
         <div class="field-group">
           <div class="checkbox-row" style="margin-bottom:10px;">
-            <label class="checkbox-label">
-              <input type="checkbox" id="soundLayerOptionalEnabled">
-              <span class="checkmark"></span>Aktifkan Optional Sound Pool
-            </label>
+            <label class="checkbox-label"><input type="checkbox" id="soundLayerOptionalEnabled"><span class="checkmark"></span>Aktifkan Optional Sound Pool</label>
           </div>
           <div class="ctrl-field ctrl-off" id="optionalSoundControls">
-            <!-- V4-6: mode selector -->
             <div style="display:flex;gap:16px;margin-bottom:12px;">
-              <label class="checkbox-label">
-                <input type="radio" name="optionalMode" value="folder" checked>
-                <span class="checkmark" style="border-radius:50%"></span> Folder
-              </label>
-              <label class="checkbox-label">
-                <input type="radio" name="optionalMode" value="files">
-                <span class="checkmark" style="border-radius:50%"></span> File Individual
-              </label>
+              <label class="checkbox-label"><input type="radio" name="optionalMode" value="folder" checked><span class="checkmark" style="border-radius:50%"></span> Folder</label>
+              <label class="checkbox-label"><input type="radio" name="optionalMode" value="files"><span class="checkmark" style="border-radius:50%"></span> File Individual</label>
             </div>
-            <!-- Mode Folder (existing) -->
             <div id="optionalFolderMode">
               <label class="field-label">Optional Sound Pool Folder</label>
               <div class="file-row">
-                <input type="text" id="soundLayerFolder" class="file-input"
-                       placeholder="Pilih folder berisi suara opsional..." readonly>
+                <input type="text" id="soundLayerFolder" class="file-input" placeholder="Pilih folder berisi suara opsional..." readonly>
                 <button class="btn btn-secondary" id="soundLayerFolderBrowse">Browse Folder</button>
               </div>
               <div id="soundLayerPoolContainer" class="pool-container hidden">
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;
-                            display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
                   <span>Pilih file untuk digunakan sebagai pool:</span>
                   <div>
-                    <button class="btn btn-ghost btn-add"
-                            style="padding:2px 6px;font-size:10px;" id="soundLayerPoolAll">All</button>
-                    <button class="btn btn-ghost btn-add"
-                            style="padding:2px 6px;font-size:10px;margin-left:4px;"
-                            id="soundLayerPoolNone">None</button>
+                    <button class="btn btn-ghost btn-add" style="padding:2px 6px;font-size:10px;" id="soundLayerPoolAll">All</button>
+                    <button class="btn btn-ghost btn-add" style="padding:2px 6px;font-size:10px;margin-left:4px;" id="soundLayerPoolNone">None</button>
                   </div>
                 </div>
                 <div id="soundLayerPoolList"></div>
               </div>
             </div>
-            <!-- Mode File Individual (baru) -->
             <div id="optionalFilesMode" class="hidden">
               <label class="field-label">File Audio Individual</label>
-              <div id="optionalIndividualFileList"
-                   style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-              <button class="btn btn-ghost btn-add" id="optionalAddFile">
-                + Tambah File Audio
-              </button>
+              <div id="optionalIndividualFileList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+              <button class="btn btn-ghost btn-add" id="optionalAddFile">+ Tambah File Audio</button>
             </div>
           </div>
         </div>
-
-        <!-- Placement Parameters -->
         <div class="section-divider"></div>
         <div class="field-group">
           <label class="field-label">Konfigurasi Penempatan (Randomization)</label>
           <div class="controls-grid">
-            <div class="field-group">
-              <label class="field-label" style="font-size: 0.78rem;">Jumlah Kejadian (1 - 50)</label>
-              <input type="number" id="soundLayerOccurrences" class="input" value="10" min="1" max="50">
-            </div>
-            <div class="field-group">
-              <label class="field-label" style="font-size: 0.78rem;">Gap Minimal Antar Suara (detik)</label>
-              <input type="number" id="soundLayerMinGap" class="input" value="5" min="0" step="0.5">
-            </div>
+            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Jumlah Kejadian (1 - 50)</label><input type="number" id="soundLayerOccurrences" class="input" value="10" min="1" max="50"></div>
+            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Gap Minimal Antar Suara (detik)</label><input type="number" id="soundLayerMinGap" class="input" value="5" min="0" step="0.5"></div>
           </div>
-          
           <div class="checkbox-row" style="margin-top: 8px;">
             <label class="checkbox-label"><input type="checkbox" id="soundLayerAllowOverlap"><span class="checkmark"></span>Izinkan Overlap Kejadian</label>
           </div>
-
           <div class="controls-grid" style="margin-top: 8px;">
-            <div class="field-group">
-              <label class="field-label" style="font-size: 0.78rem;">Window Start (%)</label>
-              <input type="number" id="soundLayerWindowStart" class="input" value="10" min="0" max="100">
-              <p class="field-hint">Mulai muncul setelah x% durasi utama</p>
-            </div>
-            <div class="field-group">
-              <label class="field-label" style="font-size: 0.78rem;">Window End (%)</label>
-              <input type="number" id="soundLayerWindowEnd" class="input" value="90" min="0" max="100">
-              <p class="field-hint">Berhenti sebelum y% durasi utama</p>
-            </div>
+            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Window Start (%)</label><input type="number" id="soundLayerWindowStart" class="input" value="10" min="0" max="100"><p class="field-hint">Mulai muncul setelah x% durasi utama</p></div>
+            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Window End (%)</label><input type="number" id="soundLayerWindowEnd" class="input" value="90" min="0" max="100"><p class="field-hint">Berhenti sebelum y% durasi utama</p></div>
           </div>
-
           <div class="controls-grid" style="margin-top: 8px;">
-            <div class="field-group">
-              <label class="field-label" style="font-size: 0.78rem;">Min Durasi per Layer (detik)</label>
-              <input type="number" id="soundLayerMinDur" class="input" value="3" min="0.5" step="0.5">
-            </div>
-            <div class="field-group">
-              <label class="field-label" style="font-size: 0.78rem;">Max Durasi per Layer (detik)</label>
-              <input type="number" id="soundLayerMaxDur" class="input" value="15" min="0.5" step="0.5">
-            </div>
+            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Min Durasi per Layer (detik)</label><input type="number" id="soundLayerMinDur" class="input" value="3" min="0.5" step="0.5"></div>
+            <div class="field-group"><label class="field-label" style="font-size: 0.78rem;">Max Durasi per Layer (detik)</label><input type="number" id="soundLayerMaxDur" class="input" value="15" min="0.5" step="0.5"></div>
           </div>
         </div>
-
-        <!-- Fade Configuration -->
         <div class="section-divider"></div>
         <div class="controls-grid">
-          <div class="field-group">
-            <label class="field-label">Fade In Duration (detik)</label>
-            <input type="number" id="soundLayerFadeIn" class="input" value="1.5" min="0.1" step="0.1">
-          </div>
-          <div class="field-group">
-            <label class="field-label">Fade Out Duration (detik)</label>
-            <input type="number" id="soundLayerFadeOut" class="input" value="1.5" min="0.1" step="0.1">
-          </div>
+          <div class="field-group"><label class="field-label">Fade In Duration (detik)</label><input type="number" id="soundLayerFadeIn" class="input" value="1.5" min="0.1" step="0.1"></div>
+          <div class="field-group"><label class="field-label">Fade Out Duration (detik)</label><input type="number" id="soundLayerFadeOut" class="input" value="1.5" min="0.1" step="0.1"></div>
         </div>
-
-        <!-- Auto Cut Silence -->
         <div class="field-group">
           <label class="field-label">Silence Threshold (dBFS)</label>
           <div style="display: flex; gap: 12px; align-items: center;">
@@ -352,30 +394,23 @@
           </div>
           <p class="field-hint">Memotong keheningan di awal/akhir file opsional secara otomatis sebelum penempatan.</p>
         </div>
-
-        <!-- Actions -->
         <div class="section-divider"></div>
         <div style="display:flex; gap:10px; margin-bottom: 12px;">
-            <button class="btn btn-secondary" id="soundLayerPreviewPlanBtn" style="flex:1;">🎲 Plan Layers</button>
+          <button class="btn btn-secondary" id="soundLayerPreviewPlanBtn" style="flex:1;">🎲 Plan Layers</button>
         </div>
         <div class="controls-grid">
           <button class="btn btn-secondary btn-full" id="soundLayerPreviewMixBtn" style="background-color: var(--primary-dark); color: white;">🔊 Preview Mix (15s)</button>
           <button class="btn btn-primary btn-full" id="soundLayerRenderBtn">▶ Render Full Output</button>
         </div>
-
-        <!-- Progress and Output -->
         <div class="progress-wrap" id="soundLayerProgressWrap">
           <div class="progress-bar"><div class="progress-fill" id="soundLayerProgressFill"></div></div>
           <div class="progress-label" id="soundLayerProgressLabel"></div>
         </div>
         <div class="log-box" id="soundLayerLog"></div>
-
-        <!-- Audio Player Preview -->
         <div id="soundLayerPlayerContainer" class="thumb-preview" style="display: none; padding: 16px; background: var(--bg-card); flex-direction: column; gap: 10px; align-items: center; justify-content: center; border: 1px solid var(--border); margin-top: 16px;">
           <div class="field-label" style="margin-bottom: 4px;">Hasil Render Layering</div>
           <audio id="soundLayerAudioPlayer" controls style="width: 100%; outline: none;"></audio>
         </div>
-
       </div>
     </section>
 
@@ -397,22 +432,13 @@
       <div class="tool-header"><h1 class="tool-title">Merge</h1><span class="tool-badge">Video + Multi Audio</span></div>
       <div class="tool-body">
         <div class="field-group"><label class="field-label">File Video</label><div class="file-row"><input type="text" id="mergeVideo" class="file-input" placeholder="Dari Video Pipeline..." readonly><button class="btn btn-secondary" id="mergeVideoBrowse">Browse</button></div></div>
-        
-        <!-- Audio Source Toggle -->
         <div class="field-group">
           <label class="field-label">Sumber Audio</label>
           <div style="display:flex;gap:16px;margin-bottom:8px;">
-            <label class="checkbox-label">
-              <input type="radio" name="mergeAudioSource" id="mergeAudioSourceManual" value="manual" checked>
-              <span class="checkmark" style="border-radius:50%"></span> Manual Layers
-            </label>
-            <label class="checkbox-label">
-              <input type="radio" name="mergeAudioSource" id="mergeAudioSourceLayer" value="layer">
-              <span class="checkmark" style="border-radius:50%"></span> Sound Layer Output
-            </label>
+            <label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceManual" value="manual" checked><span class="checkmark" style="border-radius:50%"></span> Manual Layers</label>
+            <label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceLayer" value="layer"><span class="checkmark" style="border-radius:50%"></span> Sound Layer Output</label>
           </div>
         </div>
-
         <div class="field-group"><label class="field-label">Audio Layers <span class="hint">(max 4)</span></label><div id="audioLayers"></div><button class="btn btn-ghost btn-add" id="addAudioLayer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Tambah Audio</button></div>
         <div class="field-group"><label class="field-label">Output</label><input type="text" id="mergeOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly></div>
         <button class="btn btn-primary btn-full" id="mergeProcess">▶ Merge</button>

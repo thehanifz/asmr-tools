@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════
 //  Main — sidebar routing + module init
 // ═══════════════════════════════════════════════
+import { initCrop }       from './panel-crop.js';
 import { initVideo }      from './panel-video.js';
 import { initExtract }    from './panel-extract.js';
 import { initSoundLayer } from './panel-sound-layer.js';
@@ -10,7 +11,7 @@ import { initThumbnail }  from './panel-thumbnail.js';
 import { AppState }       from './state.js';
 import { toast }          from './ui.js';
 
-const TOOLS = ['video', 'extract', 'sound-layer', 'denoise', 'merge', 'thumbnail'];
+const TOOLS = ['crop', 'video', 'extract', 'sound-layer', 'denoise', 'merge', 'thumbnail'];
 
 function activateTool(name) {
   TOOLS.forEach(t => {
@@ -24,6 +25,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // Init all panels
+initCrop();
 initVideo();
 initExtract();
 initSoundLayer();
@@ -31,8 +33,8 @@ initDenoise();
 initMerge();
 initThumbnail();
 
-// Default: video
-activateTool('video');
+// Default: crop
+activateTool('crop');
 
 // ── Auto Cleanup ──────────────────────────────────────────────────
 document.getElementById('btnAutoCleanup')?.addEventListener('click', async () => {

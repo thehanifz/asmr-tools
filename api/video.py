@@ -1,16 +1,13 @@
-"""Video processing: crop (4-side), upscale, loop + optional xfade loop + fade in/out."""
+"""Video processing: crop/upscale, loop + optional xfade loop + fade in/out."""
 import os
-import math
 import json
 import time
 from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str, safe_remove_file
 from core.env import get_thread_flags, video_encoder_flags, USE_NVENC
 
 router = APIRouter(prefix="/video", tags=["video"])
-
-MAX_XFADE_SEGMENTS = 120
 
 
 def cmd_crop(input_path, output_path, top=0, bottom=0, left=0, right=0):
@@ -58,21 +55,13 @@ def cmd_loop(input_path, output_path, duration, video_duration, keep_audio=False
     return cmd
 
 
-def cmd_fade_video(input_path, output_path, duration,
-                   fade_in=0.0, fade_out=0.0):
-    """
-    Terapkan fade in dan/atau fade out ke video.
-    fade_in  : detik dari awal
-    fade_out : detik dari akhir
-    duration : total durasi video (dibutuhkan untuk menghitung start fade out)
-    """
+def cmd_fade_video(input_path, output_path, duration, fade_in=0.0, fade_out=0.0):
     filters = []
     if fade_in > 0:
         filters.append(f"fade=t=in:st=0:d={fade_in}")
     if fade_out > 0:
         fo_start = max(0.0, duration - fade_out)
         filters.append(f"fade=t=out:st={fo_start}:d={fade_out}")
-
     vf = ",".join(filters) if filters else "copy"
     return [
         "ffmpeg", "-y", *get_thread_flags(), "-i", input_path,
@@ -83,22 +72,6 @@ def cmd_fade_video(input_path, output_path, duration,
     ]
 
 
-def build_xfade_filter(n_clips, xd, vd):
-    parts = []
-    for i in range(n_clips):
-        parts.append(f"[{i}:v]setpts=PTS-STARTPTS,format=yuv420p[c{i}]")
-    step = vd - xd
-    prev = "c0"
-    for i in range(1, n_clips):
-        offset = round(i * step, 6)
-        out = f"xf{i}" if i < n_clips - 1 else "vout"
-        parts.append(
-            f"[{prev}][c{i}]xfade=transition=fade:duration={xd}:offset={offset}[{out}]"
-        )
-        prev = out
-    return ";".join(parts)
-
-
 def cmd_loop_xfade(input_path, output_path, duration, video_duration,
                    xfade_duration=1.0, crf=23):
     vd = max(float(video_duration), 0.5)
@@ -107,7 +80,6 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
     output_dir = os.path.dirname(output_path) or os.path.dirname(input_path)
     basename   = os.path.splitext(os.path.basename(input_path))[0]
 
-    # 1. Create a seamless loop clip of duration vd - xd
     seamless_clip = os.path.join(output_dir, f"_tmp_seamless_{basename}.mp4")
     offset = vd - 2 * xd
 
@@ -128,7 +100,6 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
         seamless_clip
     ]
 
-    # 2. Fast loop seamless clip using stream copy
     cmd_lp = cmd_loop(seamless_clip, output_path, duration, vd - xd, keep_audio=False)
 
     steps_list = [
@@ -139,19 +110,142 @@ def cmd_loop_xfade(input_path, output_path, duration, video_duration,
     return steps_list, [seamless_clip]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT: Crop & Upscale (standalone, tanpa loop)
+# ─────────────────────────────────────────────────────────────────────────────
+@router.post("/crop")
+async def video_crop(request: Request):
+    """Crop dan/atau upscale video tanpa loop.
+
+    Payload:
+      input       : str  — source video path
+      output      : str  — output path (opsional)
+      crop_top    : int  — pixel crop atas
+      crop_bottom : int  — pixel crop bawah
+      crop_left   : int  — pixel crop kiri
+      crop_right  : int  — pixel crop kanan
+      upscale     : str  — resolusi target, misal '1920:1080' (opsional)
+      crf         : int  — quality (default 23)
+    """
+    try:
+        data = await request.json()
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Invalid JSON: {e}"})
+
+    input_path  = data.get("input", "")
+    output_path = data.get("output", "")
+    crop_top    = int(data.get("crop_top", 0))
+    crop_bottom = int(data.get("crop_bottom", 0))
+    crop_left   = int(data.get("crop_left", 0))
+    crop_right  = int(data.get("crop_right", 0))
+    upscale_res = data.get("upscale") or ""
+    crf         = int(data.get("crf", 23))
+
+    if not input_path or not os.path.exists(input_path):
+        return JSONResponse(status_code=400, content={"error": "Input file tidak ditemukan"})
+
+    do_crop    = any([crop_top, crop_bottom, crop_left, crop_right])
+    do_upscale = bool(upscale_res)
+
+    if not do_crop and not do_upscale:
+        return JSONResponse(status_code=400, content={"error": "Tidak ada operasi crop maupun upscale yang aktif"})
+
+    output_dir = os.path.dirname(os.path.abspath(input_path))
+    basename   = os.path.splitext(os.path.basename(input_path))[0]
+
+    if not output_path:
+        suffix = "_cropped" if do_crop and not do_upscale else ("_upscaled" if not do_crop else "_crop_up")
+        output_path = os.path.join(output_dir, f"{basename}{suffix}.mp4")
+
+    # tmp untuk pipeline 2-step (crop → upscale)
+    tmp_crop = os.path.join(output_dir, f"_tmp_{basename}_crop.mp4")
+
+    steps   = []
+    cleanup = []
+    prev    = input_path
+
+    if do_crop:
+        out = tmp_crop if do_upscale else output_path
+        steps.append((
+            cmd_crop(prev, out, crop_top, crop_bottom, crop_left, crop_right),
+            f"✂️ Crop ({crop_top}/{crop_bottom}/{crop_left}/{crop_right}px)",
+            out,
+        ))
+        if do_upscale:
+            cleanup.append(tmp_crop)
+        prev = out
+
+    if do_upscale:
+        steps.append((
+            cmd_upscale(prev, output_path, upscale_res, crf=crf),
+            f"⬆️ Upscale → {upscale_res.replace(':', '×')}",
+            output_path,
+        ))
+
+    async def run():
+        total_start = time.time()
+        encoder_name = "h264_nvenc ⚡" if USE_NVENC else "libx264 🖥"
+        yield f"data: {json.dumps({'log': f'Encoder: {encoder_name}'})}\n\n"
+        yield f"data: {json.dumps({'type': 'pipeline_start', 'total_steps': len(steps)})}\n\n"
+
+        for i, (cmd, label, out_file) in enumerate(steps):
+            t_start = time.time()
+            yield f"data: {json.dumps({'type': 'step_start', 'step': i+1, 'total': len(steps), 'label': label})}\n\n"
+            error_occurred = False
+
+            async for chunk in run_ffmpeg_stream(cmd):
+                parsed = json.loads(chunk[6:])
+                if parsed.get("status") == "error":
+                    error_occurred = True
+                    yield chunk
+                    break
+                yield chunk
+
+            if error_occurred:
+                yield f"data: {json.dumps({'type': 'step_error', 'step': i+1, 'label': label})}\n\n"
+                return
+
+            elapsed  = time.time() - t_start
+            size_str = get_file_size_str(out_file) if os.path.exists(out_file) else "?"
+            yield f"data: {json.dumps({'type': 'step_done', 'step': i+1, 'label': label, 'elapsed': fmt_duration(elapsed), 'output_size': size_str})}\n\n"
+
+        for f in cleanup:
+            safe_remove_file(f)
+
+        total_elapsed = time.time() - total_start
+        final_size = get_file_size_str(output_path) if os.path.exists(output_path) else "?"
+        yield f"data: {json.dumps({'status': 'all_done', 'output': output_path, 'final_size': final_size, 'total_elapsed': fmt_duration(total_elapsed)})}\n\n"
+
+    return StreamingResponse(run(), media_type="text/event-stream")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT: Video Loop Pipeline (loop + xfade + fade — tanpa crop)
+# ─────────────────────────────────────────────────────────────────────────────
 @router.post("/pipeline")
 async def video_pipeline(request: Request):
+    """Loop video ke durasi target dengan xfade dan fade in/out.
+
+    Payload:
+      input            : str   — source video path
+      output           : str   — output path
+      duration         : int   — target durasi detik (default 3600)
+      video_duration   : float — durasi klip sumber (detik)
+      keep_audio       : bool  — pertahankan audio original
+      crf              : int   — quality (default 23)
+      xfade_enabled    : bool
+      xfade_duration   : float
+      fade_in_enabled  : bool
+      fade_in_duration : float
+      fade_out_enabled : bool
+      fade_out_duration: float
+    """
     data = await request.json()
     input_path   = data["input"]
     final_output = data["output"]
     output_dir   = os.path.dirname(final_output) or os.path.dirname(input_path)
     basename     = os.path.splitext(os.path.basename(input_path))[0]
 
-    crop_top    = int(data.get("crop_top", 0))
-    crop_bottom = int(data.get("crop_bottom", 0))
-    crop_left   = int(data.get("crop_left", 0))
-    crop_right  = int(data.get("crop_right", 0))
-    upscale_res = data.get("upscale") or ""
     duration    = int(data.get("duration", 3600))
     video_dur   = float(data.get("video_duration", 8))
     crf         = int(data.get("crf", 23))
@@ -165,54 +259,20 @@ async def video_pipeline(request: Request):
     fade_in_dur      = float(data.get("fade_in_duration", 3.0))
     fade_out_dur     = float(data.get("fade_out_duration", 3.0))
 
-    do_crop    = any([crop_top, crop_bottom, crop_left, crop_right])
-    do_upscale = bool(upscale_res)
-    do_fade    = fade_in_enabled or fade_out_enabled
+    do_fade = fade_in_enabled or fade_out_enabled
 
-    cropped  = os.path.join(output_dir, f"_tmp_{basename}_crop.mp4")
-    upscaled = os.path.join(output_dir, f"_tmp_{basename}_up.mp4")
-    # Fade diterapkan SEBELUM xfade (pada source klip pendek)
-    faded    = os.path.join(output_dir, f"_tmp_{basename}_fade.mp4")
-    # Output sementara loop (sebelum fade-in/out pada hasil final jika tidak xfade)
-    looped   = os.path.join(output_dir, f"_tmp_{basename}_loop.mp4")
+    looped  = os.path.join(output_dir, f"_tmp_{basename}_loop.mp4")
 
     steps   = []
     cleanup = []
-    prev    = input_path
 
-    # ── 1. Crop ───────────────────────────────────────────────
-    if do_crop:
-        steps.append((
-            cmd_crop(prev, cropped, crop_top, crop_bottom, crop_left, crop_right),
-            f"\u2702\ufe0f Crop ({crop_top}/{crop_bottom}/{crop_left}/{crop_right}px)",
-            cropped,
-        ))
-        cleanup.append(cropped)
-        prev = cropped
-
-    # ── 2. Upscale ────────────────────────────────────────────
-    if do_upscale:
-        steps.append((
-            cmd_upscale(prev, upscaled, upscale_res, crf=crf),
-            f"\u2b06\ufe0f Upscale \u2192 {upscale_res.replace(':', '×')}",
-            upscaled,
-        ))
-        cleanup.append(upscaled)
-        prev = upscaled
-
-    # ── 3. Loop (xfade atau biasa) ────────────────────────────
     if xfade_enabled:
-        # Jika fade aktif: terapkan fade ke source klip pendek dulu,
-        # lalu xfade loop dari klip yang sudah di-fade.
-        # Ini menjamin fade in di awal total video & fade out di akhir.
-        # Untuk xfade mode, fade diterapkan ke output akhir (setelah loop)
-        # agar fade in/out hanya terjadi sekali di awal & akhir keseluruhan.
         xfade_out = final_output if not do_fade else looped
         if do_fade:
             cleanup.append(looped)
 
         xfade_steps, xfade_cleanup = cmd_loop_xfade(
-            prev, xfade_out, duration, video_dur, xfade_duration, crf=crf
+            input_path, xfade_out, duration, video_dur, xfade_duration, crf=crf
         )
         steps.extend(xfade_steps)
         cleanup.extend(xfade_cleanup)
@@ -225,18 +285,17 @@ async def video_pipeline(request: Request):
             if fo > 0: label_parts.append(f"fade-out {fo}s")
             steps.append((
                 cmd_fade_video(looped, final_output, duration, fi, fo),
-                f"\U0001f31f Fade video: {' + '.join(label_parts)}",
+                f"🌟 Fade video: {' + '.join(label_parts)}",
                 final_output,
             ))
     else:
-        # Loop biasa: kalau fade aktif, loop dulu ke tmp, lalu fade
         loop_out = final_output if not do_fade else looped
         if do_fade:
             cleanup.append(looped)
 
         steps.append((
-            cmd_loop(prev, loop_out, duration, video_dur, keep_audio),
-            f"\U0001f501 Loop \u2192 {fmt_duration(duration)} {'(+ audio)' if keep_audio else '(no audio)'}",
+            cmd_loop(input_path, loop_out, duration, video_dur, keep_audio),
+            f"🔁 Loop → {fmt_duration(duration)} {'(+ audio)' if keep_audio else '(no audio)'}",
             loop_out,
         ))
 
@@ -248,7 +307,7 @@ async def video_pipeline(request: Request):
             if fo > 0: label_parts.append(f"fade-out {fo}s")
             steps.append((
                 cmd_fade_video(looped, final_output, duration, fi, fo),
-                f"\U0001f31f Fade video: {' + '.join(label_parts)}",
+                f"🌟 Fade video: {' + '.join(label_parts)}",
                 final_output,
             ))
 
