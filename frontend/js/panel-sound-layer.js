@@ -271,10 +271,11 @@ export function initSoundLayer() {
       toast('Pilih minimal 1 main sound', 'error');
       return;
     }
-    if (!AppState.optionalSounds || AppState.optionalSounds.length === 0) {
-      toast('Tambah minimal 1 optional sound', 'error');
-      return;
-    }
+    // Remove the requirement for optional sounds
+    // if (!AppState.optionalSounds || AppState.optionalSounds.length === 0) {
+    //   toast('Tambah minimal 1 optional sound', 'error');
+    //   return;
+    // }
 
     logClear('soundLayerLog');
     logAppend('soundLayerLog', 'Membuat rencana penempatan...');

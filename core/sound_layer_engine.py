@@ -823,7 +823,7 @@ class SoundLayerEngine:
         # Create and return PlacementPlan
         plan = PlacementPlan(
             version="1.0",
-            main_sound_path=self.config.main_sound,
+            main_sounds=self.config.main_sounds,
             optional_sounds_folder=self.config.optional_sounds_folder,
             placements=placements
         )
