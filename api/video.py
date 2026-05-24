@@ -100,81 +100,43 @@ def build_xfade_filter(n_clips, xd, vd):
 
 
 def cmd_loop_xfade(input_path, output_path, duration, video_duration,
-                   xfade_duration=1.0):
+                   xfade_duration=1.0, crf=23):
     vd = max(float(video_duration), 0.5)
     xd = max(0.1, min(float(xfade_duration), vd * 0.45))
-    step = vd - xd
-    n_total = math.ceil(duration / step) + 1
-    n_total = max(2, n_total)
 
     output_dir = os.path.dirname(output_path) or os.path.dirname(input_path)
     basename   = os.path.splitext(os.path.basename(input_path))[0]
 
-    if USE_NVENC:
-        enc_flags = video_encoder_flags(crf=23, preset="fast")
-    else:
-        enc_flags = [
-            "-c:v", "libx264",
-            "-profile:v", "high",
-            "-level", "4.1",
-            "-pix_fmt", "yuv420p",
-            "-crf", "23",
-            "-preset", "fast",
-            "-movflags", "+faststart",
-        ]
+    # 1. Create a seamless loop clip of duration vd - xd
+    seamless_clip = os.path.join(output_dir, f"_tmp_seamless_{basename}.mp4")
+    offset = vd - 2 * xd
 
-    if n_total <= MAX_XFADE_SEGMENTS:
-        fc = build_xfade_filter(n_total, xd, vd)
-        cmd = (
-            ["ffmpeg", "-y"]
-            + ["-i", input_path] * n_total
-            + ["-filter_complex", fc,
-               "-map", "[vout]",
-               "-t", str(duration),
-               "-an"]
-            + enc_flags
-            + [output_path]
-        )
-        label = f"\U0001f500 XFade full render ({n_total} iter, fade {xd:.1f}s)"
-        return [(cmd, label, output_path)], []
-    else:
-        block_paths = []
-        start_clip  = 0
-        block_idx   = 0
-        steps_list  = []
-        while start_clip < n_total:
-            end_clip = min(start_clip + MAX_XFADE_SEGMENTS, n_total)
-            n_block  = end_clip - start_clip
-            blk_path = os.path.join(output_dir, f"_tmp_xblk{block_idx}_{basename}.mp4")
-            block_paths.append(blk_path)
-            fc_block = build_xfade_filter(n_block, xd, vd)
-            cmd_blk = (
-                ["ffmpeg", "-y"]
-                + ["-i", input_path] * n_block
-                + ["-filter_complex", fc_block,
-                   "-map", "[vout]",
-                   "-an"]
-                + enc_flags
-                + [blk_path]
-            )
-            steps_list.append((cmd_blk, f"\U0001f500 XFade block {block_idx+1} ({n_block} iter)", blk_path))
-            start_clip += n_block
-            block_idx  += 1
+    filter_complex = (
+        f"[0:v]trim=start={xd}:end={vd},setpts=PTS-STARTPTS,format=yuv420p[v1];"
+        f"[0:v]trim=start=0:end={xd},setpts=PTS-STARTPTS,format=yuv420p[v2];"
+        f"[v1][v2]xfade=transition=fade:duration={xd}:offset={offset:.6f}[vout]"
+    )
 
-        concat_list = os.path.join(output_dir, f"_tmp_xconcat_{basename}.txt")
-        with open(concat_list, "w") as f:
-            for bp in block_paths:
-                f.write(f"file '{bp}'\n")
-        cmd_concat = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", concat_list,
-            "-t", str(duration),
-            "-an", "-c:v", "copy",
-            output_path,
-        ]
-        steps_list.append((cmd_concat, "\U0001f4ce Concat blocks", output_path))
-        return steps_list, block_paths + [concat_list]
+    cmd_seamless = [
+        "ffmpeg", "-y",
+        *get_thread_flags(),
+        "-i", input_path,
+        "-filter_complex", filter_complex,
+        "-map", "[vout]",
+        "-an",
+        *video_encoder_flags(crf=crf, preset="fast"),
+        seamless_clip
+    ]
+
+    # 2. Fast loop seamless clip using stream copy
+    cmd_lp = cmd_loop(seamless_clip, output_path, duration, vd - xd, keep_audio=False)
+
+    steps_list = [
+        (cmd_seamless, f"🔄 Create seamless loop clip ({vd:.1f}s → {vd-xd:.1f}s, xfade {xd:.1f}s)", seamless_clip),
+        (cmd_lp, f"⚡ Stream-copy loop seamless clip → {fmt_duration(duration)}", output_path)
+    ]
+
+    return steps_list, [seamless_clip]
 
 
 @router.post("/pipeline")
@@ -250,7 +212,7 @@ async def video_pipeline(request: Request):
             cleanup.append(looped)
 
         xfade_steps, xfade_cleanup = cmd_loop_xfade(
-            prev, xfade_out, duration, video_dur, xfade_duration
+            prev, xfade_out, duration, video_dur, xfade_duration, crf=crf
         )
         steps.extend(xfade_steps)
         cleanup.extend(xfade_cleanup)
