@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+import re
 import time
 from datetime import datetime
 
@@ -20,7 +21,6 @@ def fmt_duration(seconds: float) -> str:
 
 
 def fmt_elapsed(elapsed: float) -> str:
-    """Format elapsed seconds jadi string singkat."""
     s = int(elapsed)
     if s < 60:
         return f"{s}s"
@@ -30,7 +30,6 @@ def fmt_elapsed(elapsed: float) -> str:
 
 
 def now_ts() -> str:
-    """Timestamp HH:MM:SS untuk prefix log."""
     return datetime.now().strftime("%H:%M:%S")
 
 
@@ -67,19 +66,39 @@ def safe_remove_file(path: str) -> None:
             return
 
 
-async def run_ffmpeg_stream(cmd: list, label: str = ""):
-    """Async generator: stream FFmpeg stderr sebagai SSE.
-    
-    Setiap log line diberi prefix timestamp [HH:MM:SS].
-    Setiap 3 detik kirim heartbeat ping supaya frontend tahu proses masih jalan.
-    Kirim elapsed_sec di setiap event supaya frontend bisa tampilkan timer.
+# Regex untuk parse "time=HH:MM:SS.xx" dari stderr FFmpeg
+_RE_TIME = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+
+
+def _parse_ffmpeg_time(line: str) -> float | None:
+    """Ekstrak posisi waktu (detik) dari baris stderr FFmpeg."""
+    m = _RE_TIME.search(line)
+    if m:
+        h, mn, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+        return h * 3600 + mn * 60 + s
+    return None
+
+
+async def run_ffmpeg_stream(
+    cmd: list,
+    label: str = "",
+    progress_start: int = 0,
+    progress_end: int = 100,
+    target_duration: float = 0.0,
+):
+    """
+    Async generator: stream FFmpeg stderr sebagai SSE.
+
+    - Kirim log line-by-line dari stderr.
+    - Kirim `progress` (0-100) berdasarkan waktu render vs target_duration.
+      Jika target_duration=0, progress dihitung dari elapsed time heuristic.
+    - progress_start / progress_end: range progress untuk multi-pass render.
+      Contoh: Pass-1 pakai (22, 60), Pass-2 pakai (64, 98).
     """
     limit = 10 * 1024 * 1024
     start_time = time.time()
     last_heartbeat = start_time
-
-    # Kirim event start
-    yield f"data: {json.dumps({'status': 'start', 'ts': now_ts(), 'label': label, 'elapsed': 0})}\n\n"
+    last_ffmpeg_time = 0.0
 
     process = await asyncio.create_subprocess_exec(
         *cmd,
@@ -88,21 +107,27 @@ async def run_ffmpeg_stream(cmd: list, label: str = ""):
         limit=limit,
     )
 
+    def _calc_progress(ffmpeg_pos: float, elapsed: float) -> int:
+        prange = progress_end - progress_start
+        if target_duration > 0 and ffmpeg_pos > 0:
+            ratio = min(ffmpeg_pos / target_duration, 1.0)
+        else:
+            # Heuristic: gunakan sqrt(elapsed/120) sebagai estimasi kasar
+            ratio = min((elapsed / 120) ** 0.5, 0.98)
+        return progress_start + int(ratio * prange)
+
     leftover = b""
     while True:
-        # Cek heartbeat setiap iterasi
         now = time.time()
         elapsed = now - start_time
 
         try:
             chunk = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
         except asyncio.TimeoutError:
-            # Timeout 1 detik — tidak ada output baru
-            # Kirim heartbeat kalau sudah 3 detik sejak heartbeat terakhir
             if now - last_heartbeat >= 3.0:
                 last_heartbeat = now
-                yield f"data: {json.dumps({'status': 'ping', 'ts': now_ts(), 'elapsed': round(elapsed, 1)})}\n\n"
-            # Cek apakah proses sudah selesai
+                prog = _calc_progress(last_ffmpeg_time, elapsed)
+                yield f"data: {json.dumps({'status': 'ping', 'ts': now_ts(), 'elapsed': round(elapsed, 1), 'progress': prog})}\n\n"
             if process.returncode is not None:
                 break
             continue
@@ -118,28 +143,37 @@ async def run_ffmpeg_stream(cmd: list, label: str = ""):
 
         for line in lines[:-1]:
             decoded = line.decode("utf-8", errors="ignore").strip()
-            if decoded:
-                elapsed = time.time() - start_time
-                yield f"data: {json.dumps({'log': decoded, 'ts': now_ts(), 'elapsed': round(elapsed, 1)})}\n\n"
+            if not decoded:
+                continue
+            elapsed = time.time() - start_time
 
-        # Heartbeat setelah burst log
+            # Parse FFmpeg time position
+            ft = _parse_ffmpeg_time(decoded)
+            if ft is not None:
+                last_ffmpeg_time = ft
+
+            prog = _calc_progress(last_ffmpeg_time, elapsed)
+            yield f"data: {json.dumps({'log': decoded, 'ts': now_ts(), 'elapsed': round(elapsed, 1), 'progress': prog})}\n\n"
+
         if time.time() - last_heartbeat >= 3.0:
             last_heartbeat = time.time()
             elapsed = time.time() - start_time
-            yield f"data: {json.dumps({'status': 'ping', 'ts': now_ts(), 'elapsed': round(elapsed, 1)})}\n\n"
+            prog = _calc_progress(last_ffmpeg_time, elapsed)
+            yield f"data: {json.dumps({'status': 'ping', 'ts': now_ts(), 'elapsed': round(elapsed, 1), 'progress': prog})}\n\n"
 
     # Flush leftover
     if leftover:
         decoded = leftover.decode("utf-8", errors="ignore").strip()
         if decoded:
             elapsed = time.time() - start_time
-            yield f"data: {json.dumps({'log': decoded, 'ts': now_ts(), 'elapsed': round(elapsed, 1)})}\n\n"
+            prog = _calc_progress(last_ffmpeg_time, elapsed)
+            yield f"data: {json.dumps({'log': decoded, 'ts': now_ts(), 'elapsed': round(elapsed, 1), 'progress': prog})}\n\n"
 
     await process.wait()
     rc = process.returncode
     elapsed = round(time.time() - start_time, 1)
 
     if rc == 0:
-        yield f"data: {json.dumps({'status': 'done', 'code': 0, 'ts': now_ts(), 'elapsed': elapsed})}\n\n"
+        yield f"data: {json.dumps({'status': 'done', 'code': 0, 'ts': now_ts(), 'elapsed': elapsed, 'progress': progress_end})}\n\n"
     else:
         yield f"data: {json.dumps({'status': 'error', 'code': rc, 'ts': now_ts(), 'elapsed': elapsed})}\n\n"
