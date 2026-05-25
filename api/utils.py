@@ -100,12 +100,16 @@ async def run_ffmpeg_stream(
     last_heartbeat = start_time
     last_ffmpeg_time = 0.0
 
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        limit=limit,
-    )
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            limit=limit,
+        )
+    except Exception as e:
+        yield f"data: {json.dumps({'status': 'error', 'log': f'Failed to start FFmpeg: {str(e)}', 'ts': now_ts(), 'elapsed': 0})}\n\n"
+        return
 
     def _calc_progress(ffmpeg_pos: float, elapsed: float) -> int:
         prange = progress_end - progress_start
