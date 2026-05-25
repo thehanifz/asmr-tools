@@ -1,5 +1,6 @@
+
 """
-Sound Layer Engine - 2-Pass Optimized Render
+Sound Layer Engine - 2-Pass Optimized Render (Merged)
 
 Pass 1 : Build optional layer  (all placements → temp PCM wav)
 Pass 2 : Loop main sounds + mix with optional layer → final output
@@ -9,6 +10,8 @@ Optimisasi:
 - Optional placements di-batch maks 32 per amix group (tree mixing)
 - Pass-1 output adalah PCM s16le 44100Hz (lossless intermediate)
 - Pass-2 hanya mix 3 stream (main_A, main_B, opt_layer) → sangat ringan
+- filter_complex ditulis ke file .txt (filter_complex_script) untuk Windows
+  menghindari WinError 206 (command line terlalu panjang)
 - Thread flags dari env.py diterapkan di setiap subprocess
 """
 
@@ -90,14 +93,13 @@ class LayerConfig:
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-AMIX_BATCH = 32          # maks input per satu amix node
-PCM_SR     = 44100       # sample-rate PCM intermediate
-PCM_FMT    = "s16le"     # format PCM intermediate
-PCM_CH     = 2           # channels
+AMIX_BATCH = 32
+PCM_SR     = 44100
+PCM_FMT    = "s16le"
+PCM_CH     = 2
 
 
 def _pcm_args() -> list:
-    """Argumen codec untuk PCM intermediate."""
     return ["-ar", str(PCM_SR), "-ac", str(PCM_CH), "-c:a", f"pcm_{PCM_FMT}", "-f", PCM_FMT]
 
 
@@ -111,10 +113,7 @@ def _escape_filter_path(path: str) -> str:
 
 
 def _batch_amix(labels: List[str]) -> Tuple[List[str], str]:
-    """
-    Buat tree-style amix dari sejumlah label.
-    Return (filter_parts, final_label).
-    """
+    """Tree-style batched amix. Return (filter_parts, final_label)."""
     if not labels:
         raise ValueError("No labels to mix")
     if len(labels) == 1:
@@ -143,11 +142,31 @@ def _batch_amix(labels: List[str]) -> Tuple[List[str], str]:
     return parts, current[0]
 
 
+def _write_filter_script(filter_complex: str, out_dir: str, temp_files: list) -> Optional[str]:
+    """
+    Tulis filter_complex ke file .txt (filter_complex_script).
+    Menghindari WinError 206 (command line terlalu panjang di Windows).
+    Return path file jika berhasil, None jika gagal.
+    """
+    if not out_dir or not os.path.exists(out_dir):
+        out_dir = tempfile.gettempdir()
+    try:
+        fd, tmp_path = tempfile.mkstemp(suffix=".txt", prefix="fc_sl_", dir=out_dir)
+        os.close(fd)
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(filter_complex)
+        temp_files.append(tmp_path)
+        return tmp_path
+    except Exception as e:
+        print(f"[filter_script] Gagal tulis temp file: {e}", file=sys.stderr)
+        return None
+
+
 # ─── Engine ───────────────────────────────────────────────────────────────────
 
 class SoundLayerEngine:
     """
-    Core engine – 2-pass optimised render.
+    Core engine – 2-pass optimised render dengan Windows-safe filter_complex_script.
     """
 
     def __init__(self, config: LayerConfig):
@@ -155,8 +174,20 @@ class SoundLayerEngine:
         self.optional_sound_files: List[str] = []
         self.main_duration: float = 0.0
         self.silence_cache: Dict[str, Tuple[float, float]] = {}
+        # 2-pass PCM cache
         self._pcm_cache: Dict[str, str] = {}   # source_path → temp pcm path
         self._temp_dir: Optional[tempfile.TemporaryDirectory] = None
+        # filter_complex_script .txt files tracker
+        self.temp_files: List[str] = []
+
+    def __del__(self):
+        """Cleanup filter_complex_script temp files saat objek dihapus."""
+        for tf in getattr(self, "temp_files", []):
+            try:
+                if os.path.exists(tf):
+                    os.remove(tf)
+            except Exception:
+                pass
 
     # ── Temp dir management ──────────────────────────────────────────────────
 
@@ -166,7 +197,7 @@ class SoundLayerEngine:
         return self._temp_dir.name
 
     def cleanup(self):
-        """Hapus semua temp file. Panggil setelah render selesai."""
+        """Hapus semua temp file (PCM cache + temp dir + filter scripts)."""
         if self._temp_dir:
             try:
                 self._temp_dir.cleanup()
@@ -174,12 +205,21 @@ class SoundLayerEngine:
                 pass
             self._temp_dir = None
         self._pcm_cache.clear()
+        for tf in self.temp_files:
+            try:
+                if os.path.exists(tf):
+                    os.remove(tf)
+            except Exception:
+                pass
+        self.temp_files.clear()
 
     # ── FFprobe / silence helpers ────────────────────────────────────────────
 
     async def get_audio_duration(self, path: str) -> float:
         if not os.path.exists(path):
             raise ValueError(f"File tidak ada: {path}")
+        if not os.path.isfile(path):
+            raise ValueError(f"Path bukan file: {path}")
         try:
             proc = await asyncio.create_subprocess_exec(
                 "ffprobe", "-v", "error",
@@ -213,7 +253,7 @@ class SoundLayerEngine:
             text = stderr.decode()
             starts = [float(m.group(1)) for m in re.finditer(r"silence_start:\s*([\d.]+)", text)]
             ends   = [float(m.group(1)) for m in re.finditer(r"silence_end:\s*([\d.]+)",   text)]
-            s_trim = ends[0]   if (starts and ends and starts[0] < 2.0) else 0.0
+            s_trim = ends[0] if (starts and ends and starts[0] < 2.0) else 0.0
             e_trim = (duration - starts[-1]) if (ends and ends[-1] > duration - 2.0 and len(starts) >= len(ends)) else 0.0
             return (s_trim, e_trim)
         except Exception as e:
@@ -232,18 +272,13 @@ class SoundLayerEngine:
     # ── Pre-decode unique sources ke PCM ────────────────────────────────────
 
     async def _predecode_source(self, path: str) -> str:
-        """
-        Decode satu file audio ke PCM WAV temp.
-        Return path temp PCM.
-        """
+        """Decode satu file audio ke PCM WAV temp. Return path temp PCM."""
         if path in self._pcm_cache:
             return self._pcm_cache[path]
-
         tmp_path = os.path.join(
             self._get_temp_dir(),
             f"src_{abs(hash(path)) % 10**8}.pcm.wav"
         )
-
         proc = await asyncio.create_subprocess_exec(
             "ffmpeg", "-y", "-i", path,
             "-ar", str(PCM_SR), "-ac", str(PCM_CH),
@@ -257,10 +292,7 @@ class SoundLayerEngine:
         return tmp_path
 
     async def predecode_all(self, plan: PlacementPlan, yield_progress=None):
-        """
-        Pre-decode semua unique optional sound ke PCM.
-        yield_progress(done, total) dipanggil tiap file selesai.
-        """
+        """Pre-decode semua unique optional sound ke PCM."""
         unique = list({p.source_file for p in plan.placements})
         total = len(unique)
         for i, src in enumerate(unique):
@@ -271,20 +303,36 @@ class SoundLayerEngine:
     # ── Scan optional sounds ─────────────────────────────────────────────────
 
     def scan_optional_sounds(self) -> List[str]:
+        """
+        Scan folder for audio files with supported extensions.
+        Raises ValueError if folder does not exist or permission denied.
+        """
         folder = self.config.optional_sounds_folder
+
+        if not os.path.exists(folder):
+            raise ValueError(f"Optional sounds folder does not exist: {folder}")
         if not os.path.isdir(folder):
-            raise ValueError(f"Folder tidak ada: {folder}")
-        exts = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg"}
-        files = []
-        for fn in os.listdir(folder):
-            _, ext = os.path.splitext(fn)
-            if ext.lower() in exts:
-                fp = os.path.abspath(os.path.join(folder, fn))
-                if os.path.isfile(fp):
-                    files.append(fp)
-        files.sort()
-        self.optional_sound_files = files
-        return files
+            raise ValueError(f"Path is not a directory: {folder}")
+
+        supported_extensions = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg"}
+        audio_files = []
+
+        try:
+            for filename in os.listdir(folder):
+                _, ext = os.path.splitext(filename)
+                if ext.lower() in supported_extensions:
+                    full_path = os.path.normpath(os.path.join(folder, filename))
+                    absolute_path = os.path.abspath(full_path)
+                    if os.path.isfile(absolute_path):
+                        audio_files.append(absolute_path)
+        except PermissionError as e:
+            raise ValueError(f"Permission denied accessing folder: {folder}") from e
+        except OSError as e:
+            raise ValueError(f"Error reading folder: {folder}") from e
+
+        audio_files.sort()
+        self.optional_sound_files = audio_files
+        return audio_files
 
     # ── Overlap helpers ──────────────────────────────────────────────────────
 
@@ -389,6 +437,27 @@ class SoundLayerEngine:
             placements=placements,
         )
 
+    # ── Filter complex script helper ─────────────────────────────────────────
+
+    def _apply_filter_complex(self, cmd: list, filter_complex: str, out_dir: str = "") -> list:
+        """
+        Tambahkan filter_complex ke cmd.
+        Pakai filter_complex_script (tulis ke .txt) untuk menghindari
+        WinError 206 (command line terlalu panjang di Windows).
+        Fallback ke -filter_complex inline jika gagal tulis file.
+        """
+        if not out_dir:
+            out_dir = (
+                os.path.dirname(os.path.abspath(self.config.output_path))
+                if self.config.output_path else ""
+            )
+        script_path = _write_filter_script(filter_complex, out_dir, self.temp_files)
+        if script_path:
+            cmd.extend(["-filter_complex_script", script_path])
+        else:
+            cmd.extend(["-filter_complex", filter_complex])
+        return cmd
+
     # ── 2-Pass FFmpeg command builder ────────────────────────────────────────
 
     def _calculate_max_overlap_count(self, placements: List[Placement]) -> int:
@@ -413,7 +482,6 @@ class SoundLayerEngine:
     ) -> list:
         """
         Pass 1: Render semua optional placements ke satu PCM track.
-        Input: PCM temp files (sudah di-predecode).
         Output: PCM WAV (s16le 44100Hz 2ch).
         """
         if not plan.placements:
@@ -423,11 +491,9 @@ class SoundLayerEngine:
         if preview_mode:
             target_dur = min(target_dur, preview_duration)
 
-        # Hitung volume normalisasi
         max_ov = self._calculate_max_overlap_count(plan.placements)
         vol_factor = 1.0 / math.sqrt(max_ov) if max_ov > 1 else 1.0
 
-        # Build unique sources map (pakai PCM cache jika ada)
         unique_sources: Dict[str, int] = {}
         cmd = ["ffmpeg", "-y"]
         idx = 0
@@ -439,19 +505,18 @@ class SoundLayerEngine:
                 unique_sources[src] = idx
                 idx += 1
 
-        # Tambah silent input untuk anchor durasi
+        # Silent anchor untuk fix durasi output
         cmd.extend(["-f", "lavfi", "-t", str(target_dur), "-i", f"aevalsrc=0:c=stereo:r={PCM_SR}"])
         silence_idx = idx
 
-        # Filter complex
         fp: List[str] = []
         delayed: List[str] = []
 
         for i, p in enumerate(plan.placements):
             if p.start_time >= target_dur:
                 continue
-            in_idx  = unique_sources[p.source_file]
-            label   = f"opt{i}"
+            in_idx   = unique_sources[p.source_file]
+            label    = f"opt{i}"
             trim_end = p.trimmed_start + p.duration
             fo_st    = p.duration - p.fade_out
             vol_val  = (p.volume / 100.0) * vol_factor
@@ -473,11 +538,8 @@ class SoundLayerEngine:
         if not delayed:
             return []
 
-        # Tree-style batched amix
         batch_parts, final_opt_label = _batch_amix(delayed)
         fp.extend(batch_parts)
-
-        # Mix dengan silent anchor untuk memastikan durasi output = target_dur
         fp.append(
             f"[{silence_idx}:a][{final_opt_label}]"
             f"amix=inputs=2:duration=first:normalize=0[optout]"
@@ -485,7 +547,7 @@ class SoundLayerEngine:
 
         from core.env import get_thread_flags
         cmd.extend(get_thread_flags())
-        cmd.extend(["-filter_complex", ";".join(fp)])
+        self._apply_filter_complex(cmd, ";".join(fp), os.path.dirname(out_pcm))
         cmd.extend(["-map", "[optout]"])
         cmd.extend(["-ar", str(PCM_SR), "-ac", str(PCM_CH), "-c:a", "pcm_s16le"])
         cmd.append(out_pcm)
@@ -501,7 +563,6 @@ class SoundLayerEngine:
     ) -> list:
         """
         Pass 2: Loop main sounds + mix dengan optional PCM layer.
-        Input: opt_pcm (Pass-1 output), main sounds (stream_loop).
         Output: file final (AAC/WAV).
         """
         target_dur = plan.target_duration
@@ -509,14 +570,10 @@ class SoundLayerEngine:
             target_dur = min(target_dur, preview_duration)
 
         xfade = min(self.config.loop_xfade, target_dur * 0.4)
-
         cmd = ["ffmpeg", "-y"]
 
-        # Main sounds – looped
         for ms in self.config.main_sounds:
             cmd.extend(["-stream_loop", "-1", "-i", ms["path"]])
-
-        # Optional layer PCM
         cmd.extend(["-i", opt_pcm])
         opt_idx = len(self.config.main_sounds)
 
@@ -536,7 +593,6 @@ class SoundLayerEngine:
             fp.append(chain)
             main_labels.append(lbl)
 
-        # Optional layer: trim ke target_dur saja
         fp.append(
             f"[{opt_idx}:a]atrim=duration={target_dur:.3f},"
             f"asetpts=PTS-STARTPTS[optlayer]"
@@ -553,7 +609,7 @@ class SoundLayerEngine:
 
         from core.env import get_thread_flags
         cmd.extend(get_thread_flags())
-        cmd.extend(["-filter_complex", ";".join(fp)])
+        self._apply_filter_complex(cmd, ";".join(fp), os.path.dirname(out_final))
         cmd.extend(["-map", "[aout]"])
 
         fmt = self.config.output_format.lower()
@@ -565,7 +621,7 @@ class SoundLayerEngine:
         cmd.append(out_final)
         return cmd
 
-    # ── Legacy single-pass (fallback, tidak dipakai oleh API baru) ───────────
+    # ── Legacy single-pass (fallback) ────────────────────────────────────────
 
     def build_ffmpeg_command(
         self,
@@ -573,12 +629,7 @@ class SoundLayerEngine:
         preview_mode: bool = False,
         preview_duration: float = 30.0,
     ) -> list:
-        """
-        Single-pass fallback – hanya dipakai bila plan.placements sangat sedikit.
-        Untuk performa optimal, gunakan build_pass1_command + build_pass2_command.
-        """
-        # Jika <= 32 placements, single-pass masih OK
-        # Lebih dari itu, panggil 2-pass via API render
+        """Single-pass fallback. Untuk performa optimal, pakai 2-pass."""
         target_dur = self.config.target_duration
         if preview_mode:
             target_dur = min(target_dur, preview_duration)
@@ -607,8 +658,8 @@ class SoundLayerEngine:
         delayed: List[str] = []
 
         for i, p in enumerate(plan.placements):
-            ii      = unique[p.source_file]
-            label   = f"opt{i}"
+            ii       = unique[p.source_file]
+            label    = f"opt{i}"
             trim_end = p.trimmed_start + p.duration
             fo_st    = p.duration - p.fade_out
             vol_val  = (p.volume / 100.0) * vol_factor
@@ -652,7 +703,7 @@ class SoundLayerEngine:
 
         from core.env import get_thread_flags
         cmd.extend(get_thread_flags())
-        cmd.extend(["-filter_complex", ";".join(fp)])
+        self._apply_filter_complex(cmd, ";".join(fp))
         cmd.extend(["-map", "[aout]"])
 
         fmt = self.config.output_format.lower()
