@@ -7,12 +7,13 @@ import { initExtract }    from './panel-extract.js';
 import { initSoundLayer } from './panel-sound-layer.js';
 import { initDenoise }    from './panel-denoise.js';
 import { initMerge }      from './panel-merge.js';
-import { initThumbnail }  from './panel-thumbnail.js';
 import { initConcat }     from './panel-concat.js';
+import { initLoopBA }     from './panel-loop-ba.js';
+import { initThumbnail }  from './panel-thumbnail.js';
 import { AppState }       from './state.js';
 import { toast }          from './ui.js';
 
-const TOOLS = ['crop', 'video', 'extract', 'sound-layer', 'denoise', 'merge', 'concat', 'thumbnail'];
+const TOOLS = ['crop', 'video', 'extract', 'sound-layer', 'denoise', 'merge', 'concat', 'loop-ba', 'thumbnail'];
 
 function activateTool(name) {
   TOOLS.forEach(t => {
@@ -33,6 +34,7 @@ initSoundLayer();
 initDenoise();
 initMerge();
 initConcat();
+initLoopBA();
 initThumbnail();
 
 // Default: crop
