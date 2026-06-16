@@ -8,30 +8,57 @@ import { toast, showFileInfo, logAppend, logClear } from './ui.js';
 export function initThumbnail() {
   const $ = id => document.getElementById(id);
 
+  let videoDuration = 5.0;
+
+  async function loadVideo(path) {
+    $("thumbInput").value = path;
+    setWorkspace(path);
+    AppState.thumbnailSourcePath = path;
+    $("thumbOutput").value = buildOutputPath(path, "_thumb", ".jpg");
+    const info = await probeFile(path);
+    if (!info.error) {
+      showFileInfo("thumbInfo", info);
+      videoDuration = info.duration || 5.0;
+    }
+  }
+
   // Auto-fill from Video Pipeline
   document.querySelector('.nav-item[data-tool="thumbnail"]')?.addEventListener("click", () => {
     if (AppState.videoProcessedPath && !$("thumbInput").value) {
-      $("thumbInput").value = AppState.videoProcessedPath;
-      $("thumbOutput").value = buildOutputPath(AppState.videoProcessedPath, "_thumb", ".jpg");
+      loadVideo(AppState.videoProcessedPath);
     }
   });
 
   $("thumbBrowse").addEventListener("click", async () => {
     const path = await browseVideo();
     if (!path) return;
-    $("thumbInput").value = path;
-    setWorkspace(path);
-    AppState.thumbnailSourcePath = path;
-    $("thumbOutput").value = buildOutputPath(path, "_thumb", ".jpg");
-    const info = await probeFile(path);
-    if (!info.error) showFileInfo("thumbInfo", info);
+    loadVideo(path);
+  });
+
+  // Start Frame capture (0s)
+  $("thumbStartFrameBtn")?.addEventListener("click", async () => {
+    const input = $("thumbInput").value;
+    if (!input) { toast("Pilih file video dulu", "error"); return; }
+    $("thumbTime").value = 0;
+    $("thumbOutput").value = buildOutputPath(input, "_frame_awal", ".jpg");
+    $("thumbProcess").click();
+  });
+
+  // End Frame capture (last second)
+  $("thumbEndFrameBtn")?.addEventListener("click", async () => {
+    const input = $("thumbInput").value;
+    if (!input) { toast("Pilih file video dulu", "error"); return; }
+    const endSec = Math.max(0, videoDuration - 0.1);
+    $("thumbTime").value = endSec.toFixed(2);
+    $("thumbOutput").value = buildOutputPath(input, "_frame_akhir", ".jpg");
+    $("thumbProcess").click();
   });
 
   $("thumbProcess").addEventListener("click", async () => {
     const input = $("thumbInput").value;
     if (!input) { toast("Pilih file video dulu", "error"); return; }
 
-    const timeSec = parseFloat($("thumbTime").value) || 5;
+    const timeSec = parseFloat($("thumbTime").value) || 0;
     const output  = $("thumbOutput").value || buildOutputPath(input, "_thumb", ".jpg");
 
     logClear("thumbLog");
