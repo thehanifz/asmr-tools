@@ -86,3 +86,19 @@ export async function previewSoundLayer(payload) {
   return await res.json();
 }
 
+// ── Clip Concatenator (Concat) API ─────────────────
+export async function browseVideos() {
+  const res = await fetch(`${BASE}/api/concat/browse-videos`);
+  const data = await res.json();
+  return data.paths || [];
+}
+
+export async function probeVideos(paths) {
+  const res = await fetch(`${BASE}/api/concat/probe-videos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paths }),
+  });
+  return await res.json();
+}
+

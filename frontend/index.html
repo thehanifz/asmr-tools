@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ASMR Tools</title>
   <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -138,6 +139,10 @@
       <button class="nav-item" data-tool="merge">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         <span>Merge</span>
+      </button>
+      <button class="nav-item" data-tool="concat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="5" x2="7" y2="5"/><line x1="2" y1="19" x2="7" y2="19"/><line x1="17" y1="19" x2="22" y2="19"/><line x1="17" y1="5" x2="22" y2="5"/></svg>
+        <span>Gabung Klip</span>
       </button>
       <button class="nav-item" data-tool="thumbnail">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
@@ -339,6 +344,72 @@
         <button class="btn btn-primary btn-full" id="mergeProcess">▶ Merge</button>
         <div class="progress-wrap" id="mergeProgressWrap"><div class="progress-bar"><div class="progress-fill" id="mergeProgressFill"></div></div><div class="progress-label" id="mergeProgressLabel"></div></div>
         <div class="log-box" id="mergeLog"></div>
+      </div>
+    </section>
+
+    <!-- Gabung Klip -->
+    <section class="tool-panel hidden" id="tool-concat">
+      <div class="tool-header">
+        <h1 class="tool-title">Gabung Klip</h1>
+        <span class="tool-badge">Multi-Video Concatenation</span>
+      </div>
+      <div class="tool-body">
+        <div class="field-group">
+          <label class="field-label">File Video Sumber</label>
+          <div class="file-row">
+            <button class="btn btn-secondary btn-full" id="concatBrowse" style="margin-top:0;">📂 Pilih File Video (Bisa Multi-Select)</button>
+          </div>
+          <p class="field-hint">Pilih 2 hingga 20 file video untuk digabungkan. Atur urutan dengan drag-and-drop.</p>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Urutan Klip Video</label>
+          <div id="concatList" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="text-align:center;padding:20px;color:var(--text-faint);border:1px dashed var(--border);border-radius:var(--radius-md);">Daftar klip kosong. Silakan pilih file video.</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--text-muted);">
+            <span>Total Klip: <strong id="concatTotalCount">0</strong></span>
+            <span>Total Durasi Gabungan: <strong id="concatTotalDuration">0s</strong></span>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="field-group">
+          <label class="field-label">Transisi Antar Klip</label>
+          <div style="display:flex;gap:16px;margin-bottom:8px;">
+            <label class="checkbox-label">
+              <input type="radio" name="concatTransition" value="hard_cut" checked>
+              <span class="checkmark" style="border-radius:50%"></span> Hard Cut (Langsung)
+            </label>
+            <label class="checkbox-label">
+              <input type="radio" name="concatTransition" value="crossfade">
+              <span class="checkmark" style="border-radius:50%"></span> Crossfade (Transisi Mulus)
+            </label>
+          </div>
+          
+          <div class="ctrl-field ctrl-off" id="concatXfadeControls">
+            <label class="field-label">Durasi Crossfade (detik)</label>
+            <input type="number" id="concatXfadeDuration" class="input" value="1.0" min="0.5" max="5.0" step="0.1" style="max-width:150px;">
+            <p class="field-hint">Durasi transisi crossfade antar klip video dan audio (0.5 – 5.0 detik).</p>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Output</label>
+          <input type="text" id="concatOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly>
+        </div>
+
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" id="concatProcess" style="flex:1;">🎬 Gabung Sekarang</button>
+          <a class="btn btn-secondary hidden" id="concatDownloadBtn" target="_blank">⬇ Download Hasil</a>
+        </div>
+
+        <div class="progress-wrap" id="concatProgressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="concatProgressFill"></div></div>
+          <div class="progress-label" id="concatProgressLabel"></div>
+        </div>
+        <div class="log-box" id="concatLog"></div>
       </div>
     </section>
 
