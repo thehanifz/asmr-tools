@@ -13,7 +13,7 @@ import { initThumbnail }  from './panel-thumbnail.js';
 import { AppState }       from './state.js';
 import { toast }          from './ui.js';
 
-const TOOLS = ['crop', 'video', 'extract', 'sound-layer', 'denoise', 'merge', 'concat', 'loop-ba', 'thumbnail'];
+const TOOLS = ['crop', 'concat', 'loop-ba', 'video', 'sound-layer', 'merge', 'extract', 'denoise', 'thumbnail'];
 
 function activateTool(name) {
   TOOLS.forEach(t => {
@@ -28,13 +28,13 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 
 // Init all panels
 initCrop();
-initVideo();
-initExtract();
-initSoundLayer();
-initDenoise();
-initMerge();
 initConcat();
 initLoopBA();
+initVideo();
+initSoundLayer();
+initMerge();
+initExtract();
+initDenoise();
 initThumbnail();
 
 // Default: crop
