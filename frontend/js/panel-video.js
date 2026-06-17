@@ -125,7 +125,13 @@ export function initVideo() {
     $('videoProcess').disabled = false;
 
     if (ok && finalData) {
-      AppState.videoProcessedPath = finalData.output || output;
+      const finalOut = finalData.output || output;
+      AppState.videoProcessedPath = finalOut;
+      const mergeVideo = document.getElementById("mergeVideo");
+      if (mergeVideo) {
+        mergeVideo.value = finalOut;
+        mergeVideo.dispatchEvent(new Event("change"));
+      }
       toast(`Video selesai · ${finalData.final_size || ''}`, 'success');
       document.querySelector('.nav-item[data-tool="video"]')?.classList.add('done');
     } else {

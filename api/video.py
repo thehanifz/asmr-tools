@@ -154,8 +154,8 @@ async def video_crop(request: Request):
     basename   = os.path.splitext(os.path.basename(input_path))[0]
 
     if not output_path:
-        suffix = "_cropped" if do_crop and not do_upscale else ("_upscaled" if not do_crop else "_crop_up")
-        output_path = os.path.join(output_dir, f"{basename}{suffix}.mp4")
+        prefix = "crop" if do_crop and not do_upscale else ("upscale" if not do_crop else "crop_up")
+        output_path = os.path.join(output_dir, f"{prefix}_{basename}.mp4")
 
     # tmp untuk pipeline 2-step (crop → upscale)
     tmp_crop = os.path.join(output_dir, f"_tmp_{basename}_crop.mp4")
@@ -242,9 +242,13 @@ async def video_pipeline(request: Request):
     """
     data = await request.json()
     input_path   = data["input"]
-    final_output = data["output"]
-    output_dir   = os.path.dirname(final_output) or os.path.dirname(input_path)
     basename     = os.path.splitext(os.path.basename(input_path))[0]
+    final_output = data.get("output", "")
+    if not final_output:
+        output_dir = os.path.dirname(input_path)
+        final_output = os.path.join(output_dir, f"loop_{basename}.mp4")
+    else:
+        output_dir   = os.path.dirname(final_output) or os.path.dirname(input_path)
 
     duration    = int(data.get("duration", 3600))
     video_dur   = float(data.get("video_duration", 8))

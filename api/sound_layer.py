@@ -124,7 +124,7 @@ async def render_mix(request: Request):
             if preview_mode:
                 output_path = os.path.join(os.path.dirname(base), "preview_mix_temp." + output_format)
             else:
-                output_path = base + "._layered." + output_format
+                output_path = os.path.join(os.path.dirname(base), f"layer_{os.path.basename(base)}.{output_format}")
         else:
             output_path = os.path.splitext(output_path)[0] + "." + output_format
 

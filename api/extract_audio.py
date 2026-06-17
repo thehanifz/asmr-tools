@@ -40,7 +40,7 @@ async def extract_audio(req: ExtractAudioRequest):
             output_path = output_path.with_suffix(f".{fmt}")
     else:
         base_dir = Path(req.workspace.strip()) if req.workspace.strip() else input_path.parent
-        output_path = base_dir / f"{input_path.stem}_audio.{fmt}"
+        output_path = base_dir / f"extract_{input_path.stem}.{fmt}"
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 

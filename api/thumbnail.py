@@ -32,7 +32,11 @@ async def extract_thumbnail(request: Request):
     """
     data       = await request.json()
     input_path = data["input"]
-    output_path = data["output"]
+    output_path = data.get("output", "")
+    if not output_path:
+        output_dir = os.path.dirname(input_path)
+        basename = os.path.splitext(os.path.basename(input_path))[0]
+        output_path = os.path.join(output_dir, f"thumb_{basename}.jpg")
     time_sec   = float(data.get("time_sec", data.get("frame_time", 5)))  # accept both
     text1      = _esc(data.get("text1", ""))
     text2      = _esc(data.get("text2", ""))

@@ -24,7 +24,11 @@ async def denoise_audio(request: Request):
     """
     data     = await request.json()
     input_p  = data["input"]
-    output_p = data["output"]
+    output_p = data.get("output", "")
+    if not output_p:
+        output_dir = os.path.dirname(input_p)
+        basename = os.path.splitext(os.path.basename(input_p))[0]
+        output_p = os.path.join(output_dir, f"denoise_{basename}.wav")
     strength = float(data.get("strength", 0.75))
     chunk    = int(data.get("chunk", 30000))
 

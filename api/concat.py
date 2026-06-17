@@ -117,7 +117,8 @@ async def render_concat(request: Request):
         output_dir = os.path.dirname(first_input)
         if not output_path:
             ts_str = time.strftime("%Y%m%d_%H%M%S")
-            output_path = os.path.join(output_dir, f"gabung_klip_{ts_str}.mp4")
+            basename = os.path.splitext(os.path.basename(first_input))[0]
+            output_path = os.path.join(output_dir, f"gabung_{ts_str}_{basename}.mp4")
 
         # Analyze codecs & resolution
         has_audios = [v["has_audio"] for v in probed_videos]

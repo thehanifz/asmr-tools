@@ -54,10 +54,25 @@ export function dirOf(filepath) {
 export function buildOutputPath(inputPath, suffix, ext) {
   if (!inputPath) return "";
   const norm = inputPath.replace(/\\/g, "/");
-  const lastDot = norm.lastIndexOf(".");
   const lastSlash = norm.lastIndexOf("/");
-  const base = lastDot > lastSlash ? norm.substring(0, lastDot) : norm;
-  return base + suffix + ext;
+  const dir = lastSlash !== -1 ? norm.substring(0, lastSlash + 1) : "";
+  const filePart = lastSlash !== -1 ? norm.substring(lastSlash + 1) : norm;
+  const lastDot = filePart.lastIndexOf(".");
+  const filename = lastDot !== -1 ? filePart.substring(0, lastDot) : filePart;
+
+  let prefix = suffix;
+  if (prefix.startsWith("._")) prefix = prefix.substring(2);
+  else if (prefix.startsWith("_")) prefix = prefix.substring(1);
+  else if (prefix.startsWith(".")) prefix = prefix.substring(1);
+
+  if (prefix === "cropped") prefix = "crop";
+  else if (prefix === "looped") prefix = "loop";
+  else if (prefix === "denoised") prefix = "denoise";
+  else if (prefix === "audio") prefix = "extract";
+  else if (prefix === "final") prefix = "merge";
+  else if (prefix === "thumb") prefix = "thumb";
+
+  return dir + prefix + "_" + filename + ext;
 }
 
 /**

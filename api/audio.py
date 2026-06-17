@@ -151,8 +151,9 @@ async def loop_audio(request: Request):
     # - Jika user tidak kasih output, pakai default dari input path
     # - Jika user kasih output, ganti ekstensi sesuai format yang dipilih
     if not output_path:
-        base = os.path.splitext(input_path)[0]
-        output_path = base + "._looped" + CODEC_MAP[fmt]["ext"]
+        output_dir = os.path.dirname(input_path)
+        basename = os.path.splitext(os.path.basename(input_path))[0]
+        output_path = os.path.join(output_dir, f"loop_{basename}{CODEC_MAP[fmt]['ext']}")
     else:
         # Ganti ekstensi sesuai format, tapi tetap filename user
         name_without_ext = os.path.splitext(output_path)[0]

@@ -79,6 +79,9 @@ export function initMerge() {
   $("mergeAudioSourceManual").addEventListener("change", syncMergeAudioSource);
   $("mergeAudioSourceLayer").addEventListener("change", syncMergeAudioSource);
 
+  $("mergeVideo").addEventListener("input", updateMergeOutput);
+  $("mergeVideo").addEventListener("change", updateMergeOutput);
+
   // Ubah default: Sound Layer Output menjadi pilihan awal
   const radioLayer = document.getElementById("mergeAudioSourceLayer");
   if (radioLayer) radioLayer.checked = true;
@@ -86,7 +89,7 @@ export function initMerge() {
 
   // Auto-fill when navigating to merge
   document.querySelector('.nav-item[data-tool="merge"]')?.addEventListener("click", () => {
-    if (AppState.videoProcessedPath && !$("mergeVideo").value) {
+    if (AppState.videoProcessedPath) {
       $("mergeVideo").value = AppState.videoProcessedPath;
       updateMergeOutput();
     }

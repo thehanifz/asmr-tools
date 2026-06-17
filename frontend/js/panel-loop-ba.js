@@ -114,6 +114,12 @@ export function initLoopBA() {
       );
 
       if (ok && finalData?.output) {
+        AppState.videoProcessedPath = finalData.output;
+        const mergeVideo = document.getElementById("mergeVideo");
+        if (mergeVideo) {
+          mergeVideo.value = finalData.output;
+          mergeVideo.dispatchEvent(new Event("change"));
+        }
         toast('Loop B+A render selesai!', 'success');
         const dlBtn = $('loopBaDownloadBtn');
         if (dlBtn) {

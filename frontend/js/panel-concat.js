@@ -110,6 +110,12 @@ export function initConcat() {
       );
 
       if (ok && finalData?.output) {
+        AppState.videoProcessedPath = finalData.output;
+        const mergeVideo = document.getElementById("mergeVideo");
+        if (mergeVideo) {
+          mergeVideo.value = finalData.output;
+          mergeVideo.dispatchEvent(new Event("change"));
+        }
         toast('Penggabungan klip selesai!', 'success');
         const dlBtn = $('concatDownloadBtn');
         if (dlBtn) {

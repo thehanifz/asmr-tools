@@ -37,7 +37,8 @@ async def render_loop_ba(request: Request):
         
         if not output_path:
             ts_str = time.strftime("%Y%m%d_%H%M%S")
-            output_path = os.path.join(output_dir, f"loop_ba_{ts_str}.mp4")
+            basename = os.path.splitext(os.path.basename(input_path))[0]
+            output_path = os.path.join(output_dir, f"loop_ba_{ts_str}_{basename}.mp4")
 
         # Segmen B duration
         b_duration = duration - midpoint

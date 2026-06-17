@@ -23,7 +23,11 @@ async def merge_video_audio(request: Request):
     """
     data = await request.json()
     video_path  = data["video"]
-    output_path = data["output"]
+    output_path = data.get("output", "")
+    if not output_path:
+        output_dir = os.path.dirname(video_path)
+        basename = os.path.splitext(os.path.basename(video_path))[0]
+        output_path = os.path.join(output_dir, f"merge_{basename}.mp4")
 
     # Support legacy single-audio format
     if "audio" in data and "audio_layers" not in data:
