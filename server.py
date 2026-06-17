@@ -15,11 +15,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_no_cache_headers(request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/js-v2") or request.url.path.endswith(".css"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
 app.include_router(router, prefix="/api")
 
 # Static assets
 if os.path.isdir("frontend/js"):
-    app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
+    app.mount("/js-v2", StaticFiles(directory="frontend/js"), name="js")
 if os.path.isdir("frontend/assets"):
     app.mount("/assets", StaticFiles(directory="frontend/assets"), name="assets")
 
