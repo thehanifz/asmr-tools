@@ -10,10 +10,11 @@ import { initMerge }      from './panel-merge.js';
 import { initConcat }     from './panel-concat.js';
 import { initLoopBA }     from './panel-loop-ba.js';
 import { initThumbnail }  from './panel-thumbnail.js';
+import { initLive }       from './panel-live.js';
 import { AppState }       from './state.js';
 import { toast }          from './ui.js';
 
-const TOOLS = ['crop', 'concat', 'loop-ba', 'video', 'sound-layer', 'merge', 'extract', 'denoise', 'thumbnail'];
+const TOOLS = ['crop', 'concat', 'loop-ba', 'video', 'sound-layer', 'merge', 'extract', 'denoise', 'thumbnail', 'live'];
 
 function activateTool(name) {
   TOOLS.forEach(t => {
@@ -36,6 +37,7 @@ initMerge();
 initExtract();
 initDenoise();
 initThumbnail();
+initLive();
 
 // Default: crop
 activateTool('crop');

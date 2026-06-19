@@ -1,0 +1,24 @@
+[
+  {
+    "filename": "input00.mp4",
+    "title": "input00",
+    "duration": 8.0,
+    "width": 1280,
+    "height": 720,
+    "size": 7416451,
+    "size_str": "7.1 MB",
+    "thumbnail": "media/video/thumbs/input00.jpg",
+    "has_audio": true
+  },
+  {
+    "filename": "loop-ba.mp4",
+    "title": "loop-ba",
+    "duration": 36.541667,
+    "width": 1280,
+    "height": 720,
+    "size": 16534733,
+    "size_str": "15.8 MB",
+    "thumbnail": "media/video/thumbs/loop-ba.jpg",
+    "has_audio": false
+  }
+]

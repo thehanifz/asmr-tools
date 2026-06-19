@@ -29,6 +29,8 @@ if os.path.isdir("frontend/js"):
     app.mount("/js-v2", StaticFiles(directory="frontend/js"), name="js")
 if os.path.isdir("frontend/assets"):
     app.mount("/assets", StaticFiles(directory="frontend/assets"), name="assets")
+if os.path.isdir("media"):
+    app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 @app.get("/style.css")
