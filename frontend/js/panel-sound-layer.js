@@ -47,6 +47,16 @@ function buildSoundItem(sound, idx, onRemove) {
         <input type="range" class="slider opt-volume" min="0" max="100" value="${sound.volume}">
         <span class="opt-vol-val">${sound.volume}%</span>
       </div>
+      <!-- Pan (posisi stereo, ala qipadd) -->
+      <div class="opt-row">
+        <label class="opt-label">Pan</label>
+        <select class="input opt-pan" style="width:130px;">
+          <option value="left" ${sound.pan==='left'?'selected':''}>Kiri</option>
+          <option value="center" ${!sound.pan||sound.pan==='center'?'selected':''}>Tengah</option>
+          <option value="right" ${sound.pan==='right'?'selected':''}>Kanan</option>
+        </select>
+        <span class="opt-unit">posisi stereo</span>
+      </div>
       <!-- Fade -->
       <div class="opt-row">
         <label class="opt-label">Fade In</label>
@@ -129,6 +139,7 @@ function buildSoundItem(sound, idx, onRemove) {
     s.volume    = parseInt(div.querySelector('.opt-volume').value);
     s.fade_in   = parseFloat(div.querySelector('.opt-fadein').value);
     s.fade_out  = parseFloat(div.querySelector('.opt-fadeout').value);
+    s.pan       = div.querySelector('.opt-pan')?.value || 'center';
     updateEst();
   }
 
@@ -143,6 +154,7 @@ function buildSoundItem(sound, idx, onRemove) {
   div.querySelectorAll('.opt-fadein, .opt-fadeout, .opt-wstart, .opt-wend').forEach(el => {
     el.addEventListener('input', syncToState);
   });
+  div.querySelector('.opt-pan')?.addEventListener('change', syncToState);
   div.querySelectorAll(`input[name^="density_"], input[name^="clip_"]`).forEach(el => {
     el.addEventListener('change', syncToState);
   });
@@ -236,6 +248,7 @@ export function initSoundLayer() {
         path,
         duration: dur,
         volume: 80,
+        pan: 'center',
         fade_in: 1.5,
         fade_out: 1.5,
         density: 'normal',
@@ -289,6 +302,7 @@ export function initSoundLayer() {
       return {
         path: s.path,
         volume: s.volume,
+        pan: s.pan || 'center',
         fade_in: s.fade_in,
         fade_out: s.fade_out,
         occurrence_count: calcOccurrences(windowSec, s.density, s.clip_size),
@@ -357,13 +371,18 @@ export function initSoundLayer() {
       }));
 
       const optVolMap = {};
+      const optPanMap = {};
       AppState.optionalSounds.forEach(s => {
         optVolMap[s.path] = s.volume;
+        optPanMap[s.path] = s.pan || 'center';
       });
 
       AppState.soundLayerPlan.placements.forEach(p => {
         if (optVolMap[p.source_file] !== undefined) {
           p.volume = optVolMap[p.source_file];
+        }
+        if (optPanMap[p.source_file] !== undefined) {
+          p.pan = optPanMap[p.source_file];
         }
       });
     }

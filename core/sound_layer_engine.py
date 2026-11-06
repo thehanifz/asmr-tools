@@ -35,6 +35,9 @@ class Placement:
     trimmed_start: float = 0.0
     trimmed_end: float = 0.0
     volume: int = 80
+    # Posisi stereo ala qipadd/asmr-mix-tools: "left" | "center" | "right"
+    # atau angka -1.0..1.0. Default tengah (perilaku lama).
+    pan: str = "center"
 
 
 @dataclass
@@ -959,7 +962,13 @@ class SoundLayerEngine:
             vol_val = (placement.volume / 100.0) * volume_factor
             if vol_val != 1.0:
                 filter_chain += f",volume={vol_val:.3f}"
-            
+
+            # Apply stereo pan (qipadd) — posisi trigger di ruang stereo
+            from core.audio_filters import pan_filter as _pan_filter
+            _pf = _pan_filter(getattr(placement, "pan", "center"))
+            if _pf:
+                filter_chain += f",{_pf}"
+
             filter_chain += f"[{label}]"
             filter_parts.append(filter_chain)
             
@@ -981,8 +990,13 @@ class SoundLayerEngine:
             )
             if vol != 1.0:
                 chain += f",volume={vol}"
+            # Stereo pan per main sound (dict key 'pan', ala qipadd)
+            from core.audio_filters import pan_filter as _pan_filter_main
+            _pfm = _pan_filter_main(ms.get("pan", "center"))
+            if _pfm:
+                chain += f",{_pfm}"
             chain += f"[{label}]"
-            
+
             filter_parts.append(chain)
             main_labels.append(label)
         

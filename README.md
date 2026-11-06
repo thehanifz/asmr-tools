@@ -16,11 +16,33 @@ Dibangun dengan FastAPI (backend) + vanilla JS ES Modules (frontend).
 | **Crop video** | Hapus N pixel dari atas/bawah/kiri/kanan |
 | **Upscale** | Scale ke FHD / QHD / 4K (lanczos) |
 | **Loop video** | Stream copy ke durasi target (tanpa re-encode) |
-| **Loop audio** | Loop + LUFS normalize + fade in/out |
-| **Merge** | Mux video + audio (stream copy, ultra cepat) |
+| **Loop audio** | Loop seamless acrossfade head-tail + fade in/out |
+| **Merge** | Mux video + audio multi-layer (volume + pan per layer, stream copy bila memungkinkan) |
 | **Thumbnail** | Ekstrak frame + preview langsung di browser |
 | **Real-time log** | SSE streaming log FFmpeg per panel |
 | **Auto-suggest path** | Output path otomatis terisi dari input |
+
+---
+
+## 🎧 Pembaruan Audio-First (Nov 2026)
+
+ASMR intinya suara, jadi jalur audio diperbaiki dengan teknik dari repo ASMR lain:
+
+- **Seamless loop benaran** (teknik `rakit_audio.sh` dari
+  [setiajiekaputra01-cmd/tools-asmr](https://github.com/setiajiekaputra01-cmd/tools-asmr)):
+  sumber dipotong head/tengah/tail, tail+head di-`acrossfade` menjadi tile
+  loopable, lalu di-`aloop` sample-accurate (sampel dihitung dari
+  sample_rate + duration_ts ffprobe). Crossfade adaptif: sumber ≤ 10 detik
+  dibatasi 1 detik. Menggantikan `-stream_loop` lama yang hard-cut.
+  Terukur: lonjakan amplitudo di sambungan turun dari 0.749 → 0.029.
+- **Merge tanpa re-encode** (pola yang sama dari tools-asmr): 1 layer audio
+  AAC tanpa pengolahan (volume 100%, pan tengah) kini di-`-c:a copy`.
+  Bila harus encode, bitrate AAC naik 192k → 320k.
+- **Pan per layer** (dari [qipadd/asmr-mix-tools](https://github.com/qipadd/asmr-mix-tools)):
+  setiap layer di Merge dan setiap placement + main sound di Sound Layer
+  bisa ditempatkan Kiri / Tengah / Kanan di ruang stereo
+  (`pan=stereo`, `amix normalize=0`), bukan cuma volume.
+- Helper bersama di `core/audio_filters.py`, tes di `tests/test_audio_filters.py`.
 
 ---
 

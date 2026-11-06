@@ -7,7 +7,7 @@ import { toast, consumeSSE }                      from './ui.js';
 
 let audioLayerCount = 0;
 
-function createAudioLayer(path = "", volume = 100) {
+function createAudioLayer(path = "", volume = 100, pan = "center") {
   const id = ++audioLayerCount;
   const div = document.createElement("div");
   div.className = "audio-layer";
@@ -18,6 +18,11 @@ function createAudioLayer(path = "", volume = 100) {
       <input type="number" class="layer-vol" value="${volume}" min="0" max="200" step="5">
       <span>%</span>
     </div>
+    <select class="layer-pan" title="Posisi stereo (pan ala qipadd)">
+      <option value="left" ${pan === "left" ? "selected" : ""}>Kiri</option>
+      <option value="center" ${pan === "center" ? "selected" : ""}>Tengah</option>
+      <option value="right" ${pan === "right" ? "selected" : ""}>Kanan</option>
+    </select>
     <button class="btn-remove" data-id="${id}" title="Hapus layer">×</button>
   `;
   // Browse click on path input
@@ -63,6 +68,9 @@ export function initMerge() {
           <input type="number" class="layer-vol" value="100" min="0" max="200" step="5" readonly>
           <span>%</span>
         </div>
+        <select class="layer-pan" disabled title="Posisi stereo">
+          <option value="center" selected>Tengah</option>
+        </select>
       `;
       layersDiv.appendChild(div);
     } else {
@@ -138,6 +146,7 @@ export function initMerge() {
     const layers = [...$("audioLayers").querySelectorAll(".audio-layer")].map(div => ({
       path:   div.querySelector(".layer-path").value,
       volume: parseInt(div.querySelector(".layer-vol").value) || 100,
+      pan:    div.querySelector(".layer-pan")?.value || "center",
     })).filter(l => l.path);
 
     if (layers.length === 0) { toast("Tambahkan minimal 1 audio", "error"); return; }

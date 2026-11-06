@@ -71,14 +71,16 @@ async def preview_placement(request: Request):
             engine.optional_sound_files = [path]
             plan = await engine.generate_placement_plan()
 
-            # Patch fade_in / fade_out / volume individually per placement
+            # Patch fade_in / fade_out / volume / pan individually per placement
             fi = float(snd.get("fade_in", 1.5))
             fo = float(snd.get("fade_out", 1.5))
             vol = int(snd.get("volume", 80))
+            pan = snd.get("pan", "center")
             for p in plan.placements:
                 p.fade_in  = fi
                 p.fade_out = fo
                 p.volume   = vol
+                p.pan      = pan
 
             all_placements.extend(plan.placements)
 
