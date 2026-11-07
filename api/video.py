@@ -2,10 +2,12 @@
 import os
 import json
 import time
+import subprocess
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from api.utils import run_ffmpeg_stream, fmt_duration, get_file_size_str, safe_remove_file
 from core.env import get_thread_flags, video_encoder_flags, USE_NVENC
+from core.video_filters import fade_segment_lengths
 
 router = APIRouter(prefix="/video", tags=["video"])
 
@@ -70,6 +72,114 @@ def cmd_fade_video(input_path, output_path, duration, fade_in=0.0, fade_out=0.0)
         "-an",
         output_path,
     ]
+
+def _probe_duration(path):
+    """Durasi file media (detik) via ffprobe; None bila gagal."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True, timeout=60,
+        )
+        return float(r.stdout.strip())
+    except Exception:
+        return None
+
+
+def cmd_fade_segments(looped_path, output_path, duration, tile_len,
+                      fade_in, fade_out, crf=23):
+    """Fade video per segmen: kepala/ekor di-encode, tengah stream copy.
+
+    Mengembalikan (steps, cleanup) atau None bila tidak layak.
+    Potongan dibuat pada kelipatan tile_len (batas tile = posisi keyframe
+    pada file hasil loop) agar concat copy presisi.
+    """
+    lengths = fade_segment_lengths(duration, tile_len, fade_in, fade_out)
+    if lengths is None:
+        return None
+    head_len, mid_len, tail_len = lengths
+
+    output_dir = os.path.dirname(output_path) or os.path.dirname(looped_path)
+    basename = os.path.splitext(os.path.basename(looped_path))[0]
+    head = os.path.join(output_dir, f"_tmp_{basename}_fadehead.mp4")
+    mid = os.path.join(output_dir, f"_tmp_{basename}_fademid.mp4")
+    tail = os.path.join(output_dir, f"_tmp_{basename}_fadetail.mp4")
+    list_file = os.path.join(output_dir, f"_tmp_{basename}_fadelist.txt")
+
+    steps = []
+    cleanup = [mid, list_file]
+    pieces = []
+
+    if fade_in > 0:
+        steps.append((
+            ["ffmpeg", "-y", *get_thread_flags(), "-i", looped_path,
+             "-t", f"{head_len:.3f}",
+             "-vf", f"fade=t=in:st=0:d={fade_in}",
+             *video_encoder_flags(crf=crf, preset="fast"),
+             "-an", head],
+            f"🌟 Fade segmen: kepala {fmt_duration(head_len)} di-encode (fade-in {fade_in}s)",
+            head,
+        ))
+        cleanup.append(head)
+        pieces.append(head)
+
+    steps.append((
+        ["ffmpeg", "-y", *get_thread_flags(),
+         "-ss", f"{head_len:.3f}", "-i", looped_path,
+         "-t", f"{mid_len:.3f}", "-an", "-c:v", "copy", mid],
+        f"⚡ Fade segmen: tengah {fmt_duration(mid_len)} stream copy (tanpa encode)",
+        mid,
+    ))
+    pieces.append(mid)
+
+    if fade_out > 0:
+        tail_start = head_len + mid_len
+        steps.append((
+            ["ffmpeg", "-y", *get_thread_flags(),
+             "-ss", f"{tail_start:.3f}", "-i", looped_path,
+             "-t", f"{tail_len:.3f}",
+             "-vf", f"fade=t=out:st={max(0.0, tail_len - fade_out):.3f}:d={fade_out}",
+             *video_encoder_flags(crf=crf, preset="fast"),
+             "-an", tail],
+            f"🌟 Fade segmen: ekor {fmt_duration(tail_len)} di-encode (fade-out {fade_out}s)",
+            tail,
+        ))
+        cleanup.append(tail)
+        pieces.append(tail)
+
+    with open(list_file, "w", encoding="utf-8") as fh:
+        for piece in pieces:
+            fh.write(f"file '{piece}'\n")
+
+    steps.append((
+        ["ffmpeg", "-y", *get_thread_flags(),
+         "-f", "concat", "-safe", "0", "-i", list_file,
+         "-c", "copy", output_path],
+        "🔗 Fade segmen: gabung kepala + tengah + ekor (concat copy)",
+        output_path,
+    ))
+    return steps, cleanup
+
+
+def cmd_fade_plan(looped_path, output_path, duration, tile_len,
+                  fade_in, fade_out, crf=23):
+    """Pilih fade segmen bila layak; selain itu fade penuh (cara lama).
+
+    Return: (steps, cleanup, is_segment).
+    """
+    seg = cmd_fade_segments(looped_path, output_path, duration, tile_len,
+                            fade_in, fade_out, crf=crf)
+    if seg is not None:
+        steps, cleanup = seg
+        return steps, cleanup, True
+    label_parts = []
+    if fade_in > 0: label_parts.append(f"fade-in {fade_in}s")
+    if fade_out > 0: label_parts.append(f"fade-out {fade_out}s")
+    return [(
+        cmd_fade_video(looped_path, output_path, duration, fade_in, fade_out),
+        f"🌟 Fade video: {' + '.join(label_parts)}",
+        output_path,
+    )], [], False
 
 
 def cmd_loop_xfade(input_path, output_path, duration, video_duration,
@@ -269,6 +379,7 @@ async def video_pipeline(request: Request):
 
     steps   = []
     cleanup = []
+    fade_ctx = {}
 
     if xfade_enabled:
         xfade_out = final_output if not do_fade else looped
@@ -281,17 +392,18 @@ async def video_pipeline(request: Request):
         steps.extend(xfade_steps)
         cleanup.extend(xfade_cleanup)
 
+        tile_len = video_dur - max(0.1, min(xfade_duration, video_dur * 0.45))
+
         if do_fade:
             fi = fade_in_dur  if fade_in_enabled  else 0.0
             fo = fade_out_dur if fade_out_enabled else 0.0
-            label_parts = []
-            if fi > 0: label_parts.append(f"fade-in {fi}s")
-            if fo > 0: label_parts.append(f"fade-out {fo}s")
-            steps.append((
-                cmd_fade_video(looped, final_output, duration, fi, fo),
-                f"🌟 Fade video: {' + '.join(label_parts)}",
-                final_output,
-            ))
+            f_steps, f_cleanup, f_segment = cmd_fade_plan(
+                looped, final_output, duration, tile_len, fi, fo, crf
+            )
+            steps.extend(f_steps)
+            cleanup.extend(f_cleanup)
+            if f_segment:
+                fade_ctx.update({"fi": fi, "fo": fo})
     else:
         loop_out = final_output if not do_fade else looped
         if do_fade:
@@ -303,17 +415,18 @@ async def video_pipeline(request: Request):
             loop_out,
         ))
 
+        tile_len = video_dur
+
         if do_fade:
             fi = fade_in_dur  if fade_in_enabled  else 0.0
             fo = fade_out_dur if fade_out_enabled else 0.0
-            label_parts = []
-            if fi > 0: label_parts.append(f"fade-in {fi}s")
-            if fo > 0: label_parts.append(f"fade-out {fo}s")
-            steps.append((
-                cmd_fade_video(looped, final_output, duration, fi, fo),
-                f"🌟 Fade video: {' + '.join(label_parts)}",
-                final_output,
-            ))
+            f_steps, f_cleanup, f_segment = cmd_fade_plan(
+                looped, final_output, duration, tile_len, fi, fo, crf
+            )
+            steps.extend(f_steps)
+            cleanup.extend(f_cleanup)
+            if f_segment:
+                fade_ctx.update({"fi": fi, "fo": fo})
 
     async def run():
         total_start = time.time()
@@ -341,6 +454,21 @@ async def video_pipeline(request: Request):
             elapsed  = time.time() - t_start
             size_str = get_file_size_str(out_file) if os.path.exists(out_file) else "?"
             yield f"data: {json.dumps({'type': 'step_done', 'step': i+1, 'label': label, 'elapsed': fmt_duration(elapsed), 'output_size': size_str})}\n\n"
+
+        if fade_ctx:
+            actual = _probe_duration(final_output)
+            if actual is None or abs(actual - duration) > 3:
+                yield f"data: {json.dumps({'log': '⚠️ Fade segmen tidak presisi — fallback ke fade penuh (re-encode)'})}\n\n"
+                legacy_cmd = cmd_fade_video(looped, final_output, duration, fade_ctx["fi"], fade_ctx["fo"])
+                legacy_error = False
+                async for chunk in run_ffmpeg_stream(legacy_cmd):
+                    parsed = json.loads(chunk[6:])
+                    if parsed.get("status") == "error":
+                        legacy_error = True
+                    yield chunk
+                if legacy_error:
+                    yield f"data: {json.dumps({'type': 'step_error', 'step': len(steps), 'label': 'Fade fallback'})}\n\n"
+                    return
 
         for f in cleanup:
             safe_remove_file(f)

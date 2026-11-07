@@ -37,6 +37,13 @@ ASMR intinya suara, jadi jalur audio diperbaiki dengan teknik dari repo ASMR lai
   Terukur: lonjakan amplitudo di sambungan turun dari 0.749 → 0.029.
 - **Merge tanpa re-encode** (pola yang sama dari tools-asmr): 1 layer audio
   AAC tanpa pengolahan (volume 100%, pan tengah) kini di-`-c:a copy`.
+- **Fade video per segmen**: fade-in/out pada pipeline video tidak lagi
+  me-re-encode seluruh video. Hanya segmen kepala & ekor (kelipatan tile,
+  ±15 detik) yang di-encode; bagian tengah stream copy lalu digabung
+  (concat). Kualitas tengah identik bit-for-bit dan waktu render video
+  panjang (1–3 jam) turun drastis. Target < 120 detik atau segmen tidak
+  layak otomatis fallback ke fade penuh lama, dengan verifikasi durasi
+  hasil sebelum selesai.
   Bila harus encode, bitrate AAC naik 192k → 320k.
 - **Pan per layer** (dari [qipadd/asmr-mix-tools](https://github.com/qipadd/asmr-mix-tools)):
   setiap layer di Merge dan setiap placement + main sound di Sound Layer
