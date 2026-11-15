@@ -41,6 +41,30 @@ function createAudioLayer(path = "", volume = 100, pan = "center") {
   return div;
 }
 
+/** Convert an absolute server path under media/ to its stream URL. */
+export function mediaUrl(path) {
+  const norm = (path || "").replace(/\\/g, "/");
+  if (!norm.includes("/media/")) return "";
+  return `/api/library/stream?path=${encodeURIComponent(path)}`;
+}
+
+/** Show the finished merge in the result player + download button. */
+export function showMergeResult(path) {
+  const url = mediaUrl(path);
+  const wrap = document.getElementById("mergeResult");
+  if (!url || !wrap) return;
+  const player = document.getElementById("mergePlayer");
+  const dl = document.getElementById("mergeDownload");
+  const name = document.getElementById("mergeResultName");
+  if (player) player.src = url;
+  if (dl) {
+    dl.href = url + "&dl=1";
+    dl.setAttribute("download", path.split(/[\\/]/).pop() || "merge.mp4");
+  }
+  if (name) name.textContent = path.split(/[\\/]/).pop() || "";
+  wrap.style.display = "block";
+}
+
 function updateMergeOutput() {
   const videoPath = document.getElementById("mergeVideo").value;
   if (videoPath) {
@@ -97,6 +121,7 @@ export function initMerge() {
 
   // Auto-fill when navigating to merge
   document.querySelector('.nav-item[data-tool="merge"]')?.addEventListener("click", () => {
+    if (AppState.mergeFinalPath) showMergeResult(AppState.mergeFinalPath);
     if (AppState.videoProcessedPath) {
       $("mergeVideo").value = AppState.videoProcessedPath;
       updateMergeOutput();
@@ -166,6 +191,7 @@ export function initMerge() {
       AppState.mergeFinalPath = output;
       toast(`Merge selesai · ${finalData?.size || ""}`, "success");
       document.querySelector('.nav-item[data-tool="merge"]')?.classList.add("done");
+      showMergeResult(output);
     } else {
       toast("Merge gagal", "error");
     }

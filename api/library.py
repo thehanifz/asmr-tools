@@ -9,8 +9,8 @@ import json
 import os
 import subprocess
 
-from fastapi import APIRouter
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 router = APIRouter(tags=["library"])
 
@@ -141,6 +141,65 @@ async def library_files(kind: str = "video"):
         except Exception:
             pass
     return {"groups": groups, "kind": kind}
+
+
+@router.get("/library/stream")
+async def library_stream(path: str, request: Request, dl: int = 0):
+    """Range-capable streaming for media/ files (result preview).
+
+    The /media StaticFiles mount in this Starlette version ignores
+    Range requests, so browsers cannot seek in long videos. This
+    endpoint serves media/video + media/audio files with proper
+    206 partial responses. dl=1 forces a download disposition.
+    """
+    media_root = os.path.realpath(os.path.join(REPO_ROOT, "media"))
+    full = os.path.realpath(path)
+    if not full.startswith(media_root + os.sep) or not os.path.isfile(full):
+        return JSONResponse({"error": "Berkas di luar folder media"}, status_code=403)
+    ext = os.path.splitext(full)[1].lower()
+    if ext not in VIDEO_EXTS | AUDIO_EXTS:
+        return JSONResponse({"error": "Bukan berkas media"}, status_code=400)
+
+    size = os.path.getsize(full)
+    range_header = request.headers.get("range", "")
+    start, end = 0, size - 1
+    status = 200
+    if range_header.startswith("bytes="):
+        try:
+            first, _, last = range_header[6:].partition("-")
+            if first:
+                start = int(first)
+            if last:
+                end = min(int(last), size - 1)
+            status = 206
+        except ValueError:
+            start, end, status = 0, size - 1, 200
+    length = end - start + 1
+
+    def _chunks():
+        with open(full, "rb") as f:
+            f.seek(start)
+            remaining = length
+            while remaining > 0:
+                data = f.read(min(1024 * 1024, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(length),
+    }
+    if status == 206:
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+    if dl:
+        headers["Content-Disposition"] = (
+            f'attachment; filename="{os.path.basename(full)}"'
+        )
+    media_type = "video/mp4" if ext in VIDEO_EXTS else "audio/mpeg"
+    return StreamingResponse(_chunks(), status_code=status,
+                             headers=headers, media_type=media_type)
 
 
 @router.get("/library/sounds")
