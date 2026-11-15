@@ -505,6 +505,11 @@ export function initSoundLayer() {
 
       if (result.ok && result.finalData?.output) {
         toast('Render selesai!', 'success');
+        if (!isPreview) {
+          // Hand the finished mix to the Merge panel (auto-fill source)
+          AppState.soundLayerOutputPath = result.finalData.output;
+          setWorkspace(result.finalData.output);
+        }
         if (isPreview) {
           const player = $('soundLayerPlayerContainer');
           const audio  = $('soundLayerAudioPlayer');
