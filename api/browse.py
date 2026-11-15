@@ -1,9 +1,19 @@
-"""File/folder browse dialogs via tkinter."""
+"""File/folder browse dialogs via tkinter.
+
+On a headless server (no $DISPLAY) the native dialog cannot open.
+Instead of a 500, return HTTP 200 with an "error" message the UI shows
+as a toast, pointing the user at the sound-library dropdown.
+"""
 import os
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 router = APIRouter(tags=["browse"])
+
+HEADLESS_MSG = (
+    "Dialog berkas tidak tersedia saat tool berjalan sebagai server. "
+    "Pilih suara lewat dropdown Pustaka Suara."
+)
 
 
 def _open_tk():
@@ -14,43 +24,34 @@ def _open_tk():
     return root
 
 
-@router.get("/browse")
-async def browse_video():
+def _dialog(kind, title, filetypes=None):
+    if not os.environ.get("DISPLAY"):
+        return JSONResponse({"path": "", "error": HEADLESS_MSG})
     try:
         from tkinter import filedialog
         root = _open_tk()
-        path = filedialog.askopenfilename(
-            title="Pilih Video",
-            filetypes=[("Video", "*.mp4 *.mov *.avi *.mkv *.webm"), ("All", "*.*")],
-        )
+        if kind == "folder":
+            path = filedialog.askdirectory(title=title)
+        else:
+            path = filedialog.askopenfilename(title=title, filetypes=filetypes)
         root.destroy()
         return {"path": path.replace("/", os.sep) if path else ""}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    except Exception:
+        return JSONResponse({"path": "", "error": HEADLESS_MSG})
+
+
+@router.get("/browse")
+async def browse_video():
+    return _dialog("file", "Pilih Video",
+                   [("Video", "*.mp4 *.mov *.avi *.mkv *.webm"), ("All", "*.*")])
 
 
 @router.get("/browse-audio")
 async def browse_audio():
-    try:
-        from tkinter import filedialog
-        root = _open_tk()
-        path = filedialog.askopenfilename(
-            title="Pilih Audio",
-            filetypes=[("Audio", "*.mp3 *.wav *.ogg *.flac *.m4a"), ("All", "*.*")],
-        )
-        root.destroy()
-        return {"path": path.replace("/", os.sep) if path else ""}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    return _dialog("file", "Pilih Audio",
+                   [("Audio", "*.mp3 *.wav *.ogg *.flac *.m4a"), ("All", "*.*")])
 
 
 @router.get("/browse-folder")
 async def browse_folder():
-    try:
-        from tkinter import filedialog
-        root = _open_tk()
-        path = filedialog.askdirectory(title="Pilih Output Folder")
-        root.destroy()
-        return {"path": path.replace("/", os.sep) if path else ""}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    return _dialog("folder", "Pilih Output Folder")

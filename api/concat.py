@@ -21,6 +21,11 @@ def _open_tk():
 
 @router.get("/browse-videos")
 async def browse_videos():
+    # Headless servers have no display for a tkinter dialog; the UI
+    # uses the server file picker (GET /api/library/files) instead.
+    if not os.environ.get("DISPLAY"):
+        return {"paths": [], "error": "Dialog berkas tidak tersedia di server "
+                "headless — gunakan pemilih berkas server di UI."}
     try:
         from tkinter import filedialog
         root = _open_tk()

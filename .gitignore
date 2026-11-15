@@ -54,3 +54,7 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# cache durasi ffprobe (dibuat runtime)
+.durations.json
+media/.durations.json

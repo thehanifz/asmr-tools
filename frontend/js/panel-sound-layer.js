@@ -2,7 +2,7 @@
 //  Panel: Sound Layer — Per-Sound Smart Density
 // ═══════════════════════════════════════════════════════════════
 import { AppState, setWorkspace } from './state.js';
-import { browseAudio, probeFile, previewSoundLayer } from './api.js';
+import { browseAudio, probeFile, previewSoundLayer, fetchLibrarySounds } from './api.js';
 import { toast, logClear, logAppend, consumeSSE } from './ui.js';
 
 function $(id) { return document.getElementById(id); }
@@ -14,6 +14,13 @@ const CLIP_RANGE = {
   medium: { min: 8,  max: 20 },
   long:   { min: 20, max: 45 },
 };
+
+// Preview suara asli untuk berkas yang berasal dari Pustaka Suara server
+function previewHtml(path) {
+  if (!path || !path.includes('/asmr-service/library/')) return '';
+  const src = `/api/library/play?path=${encodeURIComponent(path)}`;
+  return `<audio controls preload="none" src="${src}" style="width:100%;height:34px;"></audio>`;
+}
 
 function calcOccurrences(windowSec, density, clipSize) {
   const range = CLIP_RANGE[clipSize] || CLIP_RANGE.medium;
@@ -41,6 +48,7 @@ function buildSoundItem(sound, idx, onRemove) {
       <button class="btn btn-ghost opt-remove-btn" title="Hapus" style="color:var(--danger);padding:2px 6px;margin-left:4px;">×</button>
     </div>
     <div class="opt-sound-body collapsed">
+      ${previewHtml(sound.path) ? `<div class="opt-row" style="align-items:center;"><label class="opt-label">Preview</label><div style="flex:1;">${previewHtml(sound.path)}</div></div>` : ''}
       <!-- Volume -->
       <div class="opt-row">
         <label class="opt-label">Volume</label>
@@ -204,6 +212,7 @@ export function initSoundLayer() {
           <input type="range" class="slider vol-slider" data-idx="${idx}" min="0" max="100" value="${snd.volume}" style="flex:1;">
           <span style="font-family:var(--font-mono);font-size:12px;width:40px;text-align:right;">${snd.volume}%</span>
         </div>
+        ${previewHtml(snd.path)}
       `;
       div.querySelector('.btn-ghost').addEventListener('click', (e) => {
         AppState.mainSounds.splice(parseInt(e.currentTarget.dataset.idx), 1);
@@ -230,6 +239,87 @@ export function initSoundLayer() {
     } catch (e) {
       toast('Gagal membuka file browser', 'error');
     }
+  });
+
+  // ── Library dropdowns (Pustaka Suara di server) ─────────────
+  function fmtDur(sec) {
+    sec = Math.round(sec || 0);
+    return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+  }
+
+  function buildLibrarySelect(id) {
+    const sel = document.createElement('select');
+    sel.id = id;
+    sel.className = 'input';
+    sel.style.cssText = 'width:100%;margin-bottom:10px;';
+    sel.innerHTML = '<option value="">🎧 Memuat Pustaka Suara…</option>';
+    sel.disabled = true;
+    return sel;
+  }
+
+  const mainLibSelect = buildLibrarySelect('soundLayerMainLibSelect');
+  $('soundLayerMainList')?.before(mainLibSelect);
+  const optLibSelect = buildLibrarySelect('optLibSelect');
+  $('optSoundList')?.before(optLibSelect);
+
+  async function fillLibrarySelects() {
+    try {
+      const data = await fetchLibrarySounds();
+      for (const sel of [mainLibSelect, optLibSelect]) {
+        sel.innerHTML = '<option value="">🎧 Pilih dari Pustaka Suara…</option>';
+        (data.groups || []).forEach(g => {
+          const og = document.createElement('optgroup');
+          og.label = g.label;
+          g.items.forEach(it => {
+            const op = document.createElement('option');
+            op.value = it.path;
+            op.dataset.duration = it.duration || 0;
+            op.textContent = `${it.name} · ${fmtDur(it.duration)}`;
+            og.appendChild(op);
+          });
+          sel.appendChild(og);
+        });
+        sel.disabled = false;
+      }
+    } catch (e) {
+      for (const sel of [mainLibSelect, optLibSelect]) {
+        sel.innerHTML = '<option value="">🎧 Pustaka Suara tidak tersedia</option>';
+      }
+    }
+  }
+  fillLibrarySelects();
+
+  mainLibSelect.addEventListener('change', () => {
+    const path = mainLibSelect.value;
+    mainLibSelect.value = '';
+    if (!path) return;
+    if (AppState.mainSounds.length >= 3) {
+      toast('Main sound maksimal 3', 'error');
+      return;
+    }
+    setWorkspace(path);
+    AppState.mainSounds.push({ path, volume: 100 });
+    renderMainSoundsList();
+  });
+
+  optLibSelect.addEventListener('change', () => {
+    const opt = optLibSelect.selectedOptions[0];
+    const path = optLibSelect.value;
+    optLibSelect.value = '';
+    if (!path) return;
+    AppState.optionalSounds.push({
+      path,
+      duration: parseFloat(opt?.dataset.duration || 0),
+      volume: 80,
+      pan: 'center',
+      fade_in: 1.5,
+      fade_out: 1.5,
+      density: 'normal',
+      clip_size: 'medium',
+      window_start: 10,
+      window_end: 90,
+    });
+    renderOptionalList();
   });
 
   // ── Optional sounds ──────────────────────────────────────────
