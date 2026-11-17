@@ -1,0 +1,13 @@
+[Unit]
+Description=Reverse SSH bridge VM -> CasaOS for ASMR service (CasaOS cloudflared origin)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh -p 555 -i /home/hatch/.ssh/id_ed25519 -o UserKnownHostsFile=/home/hatch/.ssh/known_hosts -o StrictHostKeyChecking=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -N -R 127.0.0.1:18320:127.0.0.1:8320 root@163.53.186.250
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

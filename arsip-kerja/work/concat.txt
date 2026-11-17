@@ -1,0 +1,4 @@
+file '/home/hatch/workspace/asmr-service/work/seg1.mp4'
+file '/home/hatch/workspace/asmr-service/work/seg2.mp4'
+file '/home/hatch/workspace/asmr-service/work/seg3.mp4'
+file '/home/hatch/workspace/asmr-service/work/seg4.mp4'

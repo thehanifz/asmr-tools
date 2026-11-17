@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel for ASMR service (VM Muse)
+After=network-online.target
+Wants=network-online.target
+ConditionFileNotEmpty=/home/hatch/workspace/asmr-service/secrets/cloudflared.env
+
+[Service]
+Type=simple
+EnvironmentFile=/home/hatch/workspace/asmr-service/secrets/cloudflared.env
+ExecStart=/home/hatch/workspace/tools/cloudflared/cloudflared tunnel --no-autoupdate --protocol http2 run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

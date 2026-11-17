@@ -1,0 +1,15 @@
+[Unit]
+Description=ASMR Tools UI (FastAPI) on Muse VM - origin for asmr.thehanifz.my.id
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hatch/workspace/projects/asmr-tools
+ExecStart=/home/hatch/workspace/projects/asmr-tools/venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8320
+Restart=always
+RestartSec=5
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
