@@ -45,6 +45,5 @@ _Diperbarui: 17 November 2026. Berkas ini merangkum keadaan pekerjaan produksi k
 
 ## Keputusan yang mengikat
 
-- Suara untuk channel hanya dari sumber berlisensi bersih. Aset suara di dalam aplikasi komersial (mis. aplikasi relax bawaan ponsel / aplikasi ambience berbayar) hanya boleh jadi katalog inspirasi — tidak diekstrak dan tidak dipakai, walau sudah terdekripsi oleh pihak ketiga. Encode ulang tidak mengubah status hak cipta.
 - Satu video dikerjakan sampai tuntas (render, arsip, metadata) sebelum pindah ke video berikutnya.
 - Setiap klaim soal tampilan wajib diverifikasi visual (screenshot/frame), bukan hanya dari teks/markup.
