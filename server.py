@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from api.router import router
 
 app = FastAPI(title="ASMR Tools", version="2.0")
@@ -21,6 +21,34 @@ async def add_no_cache_headers(request, call_next):
     if request.url.path == "/" or request.url.path.startswith("/js-v2") or request.url.path.endswith(".css"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
+
+# --- Login gate sederhana (HTTP Basic) ---
+# Aktif hanya bila env ASMR_AUTH_USER dan ASMR_AUTH_PASS_SHA256 diisi
+# (di VM: lewat EnvironmentFile systemd menunjuk file secrets di luar repo).
+# Tanpa env itu, tool berjalan terbuka seperti biasa (mis. dev lokal).
+import base64, hashlib, secrets as _secrets
+_AUTH_USER = os.environ.get("ASMR_AUTH_USER", "")
+_AUTH_PASS_SHA256 = os.environ.get("ASMR_AUTH_PASS_SHA256", "")
+
+@app.middleware("http")
+async def basic_auth_gate(request, call_next):
+    if _AUTH_USER and _AUTH_PASS_SHA256:
+        hdr = request.headers.get("authorization", "")
+        ok = False
+        if hdr.startswith("Basic "):
+            try:
+                raw = base64.b64decode(hdr[6:]).decode("utf-8")
+                u, _, p = raw.partition(":")
+                ok = (_secrets.compare_digest(u, _AUTH_USER)
+                      and _secrets.compare_digest(
+                          hashlib.sha256(p.encode()).hexdigest(),
+                          _AUTH_PASS_SHA256))
+            except Exception:
+                ok = False
+        if not ok:
+            return Response(status_code=401, content="Login diperlukan.",
+                            headers={"WWW-Authenticate": 'Basic realm="ASMR Tools"'})
+    return await call_next(request)
 
 app.include_router(router, prefix="/api")
 
