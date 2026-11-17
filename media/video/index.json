@@ -20,5 +20,16 @@
     "size_str": "15.8 MB",
     "thumbnail": "media/video/thumbs/loop-ba.jpg",
     "has_audio": false
+  },
+  {
+    "filename": "Rain_falling_in_garden_7f0c1a96_720p.mp4",
+    "title": "Rain_falling_in_garden_7f0c1a96_720p",
+    "duration": 10.0,
+    "width": 1280,
+    "height": 720,
+    "size": 5315878,
+    "size_str": "5.1 MB",
+    "thumbnail": "media/video/thumbs/Rain_falling_in_garden_7f0c1a96_720p.jpg",
+    "has_audio": true
   }
 ]
