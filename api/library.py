@@ -1,6 +1,6 @@
 """Sound library listing — server-side catalog for dropdown pickers.
 
-Scans ASMR_LIBRARY_DIR (default: ~/workspace/asmr-service/library) whose
+Scans ASMR_LIBRARY_DIR (default: <repo>/library) whose
 subfolders are sound elements (hujan, api, angin, air, petir, burung,
 tambahan). Durations are probed once with ffprobe and cached on disk
 next to the library so repeat calls are instant.
@@ -14,8 +14,13 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 router = APIRouter(tags=["library"])
 
+# Default: <repo>/library (moved into the repo 17 Nov 2026; audio files are
+# git-ignored). Same expression as REPO_ROOT below, kept inline because this
+# constant is defined before it. A symlink at the old asmr-service/library
+# path keeps old absolute paths working.
 LIBRARY_DIR = os.environ.get(
-    "ASMR_LIBRARY_DIR", "/home/hatch/workspace/asmr-service/library"
+    "ASMR_LIBRARY_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "library"),
 )
 CACHE_FILE = os.path.join(LIBRARY_DIR, ".durations.json")
 AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".oga", ".flac", ".m4a", ".aac"}
@@ -93,7 +98,7 @@ def _scan_media(folder, exts, cache, cache_prefix):
             continue
         if os.path.splitext(name)[1].lower() not in exts:
             continue
-        if name.startswith(("preview_", "fc_sl")) or "_temp" in name:
+        if name.startswith(("preview_", "fc_sl")):
             continue
         key = f"{cache_prefix}/{name}:{os.path.getmtime(path):.0f}"
         if key not in cache:
@@ -225,7 +230,9 @@ async def library_sounds():
             if os.path.splitext(name)[1].lower() not in AUDIO_EXTS:
                 continue
             # Engine temp artifacts land next to source files; never list them
-            if name.startswith(("preview_", "fc_sl")) or "_temp" in name:
+            # (preview_* covers preview_mix_temp; a "_temp" substring check
+            # wrongly hid oriental_temple.ogg, so it was dropped 17 Nov 2026)
+            if name.startswith(("preview_", "fc_sl")):
                 continue
             key = f"{element}/{name}:{os.path.getmtime(path):.0f}"
             if key not in cache:

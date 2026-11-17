@@ -116,6 +116,27 @@ async def render_mix(request: Request):
         preview_duration = float(data.get("preview_duration", 30.0))
         silence_threshold = -50.0  # hardcoded
 
+        if not preview_mode:
+            # Render penuh dijalankan sebagai Job (core/jobs.py): segmen
+            # jendela waktu, terlepas dari request, bisa dilanjutkan bila
+            # service dimulai ulang. Mode preview (30 dtk) tetap memakai
+            # jalur single-pass lama di bawah.
+            from api.jobs import create_job_with_plan
+            from api.utils import fmt_duration
+            from core.jobs import attach_stream
+            from core.runners import plan_sound_layer
+            label = f"Sound Layer · {fmt_duration(target_duration)}"
+            try:
+                record = await create_job_with_plan(
+                    "sound-layer", label, data, plan_sound_layer)
+            except ValueError as e:
+                return JSONResponse({"error": str(e)}, status_code=400)
+            return StreamingResponse(
+                attach_stream(record["id"]),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
         if not plan_data:
             return JSONResponse({"error": "Placement plan is required"}, status_code=400)
 

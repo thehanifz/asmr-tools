@@ -24,6 +24,19 @@ async def add_no_cache_headers(request, call_next):
 
 app.include_router(router, prefix="/api")
 
+
+@app.on_event("startup")
+async def jobs_startup_sweep():
+    """Jobs left running/queued when the previous process died are
+    marked interrupted so they can be resumed from their checkpoints."""
+    try:
+        from core.jobs import sweep_interrupted
+        marked = sweep_interrupted()
+        if marked:
+            print(f"[jobs] startup sweep: {len(marked)} job(s) marked interrupted: {marked}", flush=True)
+    except Exception as e:
+        print(f"[jobs] startup sweep failed: {e}", flush=True)
+
 # Static assets
 if os.path.isdir("frontend/js"):
     app.mount("/js-v2", StaticFiles(directory="frontend/js"), name="js")

@@ -2,7 +2,8 @@
 //  Panel: Sound Layer — Per-Sound Smart Density
 // ═══════════════════════════════════════════════════════════════
 import { AppState, setWorkspace } from './state.js';
-import { browseAudio, probeFile, previewSoundLayer, fetchLibrarySounds } from './api.js';
+import { uploadAudioFromDevice, fetchServerFiles, probeFile, previewSoundLayer } from './api.js';
+import { createSoundPicker } from './sound-picker.js';
 import { toast, logClear, logAppend, consumeSSE } from './ui.js';
 
 function $(id) { return document.getElementById(id); }
@@ -17,7 +18,7 @@ const CLIP_RANGE = {
 
 // Preview suara asli untuk berkas yang berasal dari Pustaka Suara server
 function previewHtml(path) {
-  if (!path || !path.includes('/asmr-service/library/')) return '';
+  if (!path || !path.includes('/library/')) return '';
   const src = `/api/library/play?path=${encodeURIComponent(path)}`;
   return `<audio controls preload="none" src="${src}" style="width:100%;height:34px;"></audio>`;
 }
@@ -228,106 +229,93 @@ export function initSoundLayer() {
     });
   }
 
-  $('soundLayerAddMainBtn')?.addEventListener('click', async () => {
+  $('soundLayerAddMainBtn')?.addEventListener('click', async (e) => {
     if (AppState.mainSounds.length >= 3) return;
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Upload…';
     try {
-      const path = await browseAudio();
+      const path = await uploadAudioFromDevice();
       if (!path) return;
       setWorkspace(path);
       AppState.mainSounds.push({ path, volume: 100 });
       renderMainSoundsList();
-    } catch (e) {
-      toast('Gagal membuka file browser', 'error');
+      fillLibraryPickers(); // berkas baru ikut muncul di dropdown
+    } catch (err) {
+      toast('Upload gagal: ' + err.message, 'error');
+    } finally {
+      btn.disabled = AppState.mainSounds.length >= 3;
+      btn.textContent = orig;
     }
   });
 
-  // ── Library dropdowns (Pustaka Suara di server) ─────────────
-  function fmtDur(sec) {
-    sec = Math.round(sec || 0);
-    return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
-  }
+  // ── Library pickers (Pustaka Suara di server) ───────────────
+  // Dropdown kustom: klik file = preview, tombol ">" = pilih,
+  // header kategori bisa expand/collapse. Lihat sound-picker.js.
+  const mainLibPicker = createSoundPicker({
+    id: 'soundLayerMainLibPicker',
+    placeholder: '🎧 Pilih dari Pustaka Suara…',
+    onSelect: (item) => {
+      if (AppState.mainSounds.length >= 3) {
+        toast('Main sound maksimal 3', 'error');
+        return;
+      }
+      setWorkspace(item.path);
+      AppState.mainSounds.push({ path: item.path, volume: 100 });
+      renderMainSoundsList();
+    },
+  });
+  $('soundLayerMainList')?.before(mainLibPicker.root);
 
-  function buildLibrarySelect(id) {
-    const sel = document.createElement('select');
-    sel.id = id;
-    sel.className = 'input';
-    sel.style.cssText = 'width:100%;margin-bottom:10px;';
-    sel.innerHTML = '<option value="">🎧 Memuat Pustaka Suara…</option>';
-    sel.disabled = true;
-    return sel;
-  }
+  const optLibPicker = createSoundPicker({
+    id: 'optLibPicker',
+    placeholder: '🎧 Pilih dari Pustaka Suara…',
+    onSelect: (item) => {
+      AppState.optionalSounds.push({
+        path: item.path,
+        duration: item.duration || 0,
+        volume: 80,
+        pan: 'center',
+        fade_in: 1.5,
+        fade_out: 1.5,
+        density: 'normal',
+        clip_size: 'medium',
+        window_start: 10,
+        window_end: 90,
+      });
+      renderOptionalList();
+    },
+  });
+  $('optSoundList')?.before(optLibPicker.root);
 
-  const mainLibSelect = buildLibrarySelect('soundLayerMainLibSelect');
-  $('soundLayerMainList')?.before(mainLibSelect);
-  const optLibSelect = buildLibrarySelect('optLibSelect');
-  $('optSoundList')?.before(optLibSelect);
-
-  async function fillLibrarySelects() {
+  async function fillLibraryPickers() {
     try {
-      const data = await fetchLibrarySounds();
-      for (const sel of [mainLibSelect, optLibSelect]) {
-        sel.innerHTML = '<option value="">🎧 Pilih dari Pustaka Suara…</option>';
-        (data.groups || []).forEach(g => {
-          const og = document.createElement('optgroup');
-          og.label = g.label;
-          g.items.forEach(it => {
-            const op = document.createElement('option');
-            op.value = it.path;
-            op.dataset.duration = it.duration || 0;
-            op.textContent = `${it.name} · ${fmtDur(it.duration)}`;
-            og.appendChild(op);
-          });
-          sel.appendChild(og);
-        });
-        sel.disabled = false;
-      }
+      // Katalog lengkap: Audio di Server + Pustaka Suara (grup media ditaruh
+      // terakhir supaya kategori Hujan tetap yang pertama terbuka).
+      const data = await fetchServerFiles('audio');
+      const groups = (data.groups || []).slice().sort(
+        (a, b) => (a.element === 'media-audio' ? 1 : 0) - (b.element === 'media-audio' ? 1 : 0)
+      );
+      mainLibPicker.setGroups(groups);
+      optLibPicker.setGroups(groups);
     } catch (e) {
-      for (const sel of [mainLibSelect, optLibSelect]) {
-        sel.innerHTML = '<option value="">🎧 Pustaka Suara tidak tersedia</option>';
-      }
+      mainLibPicker.setError();
+      optLibPicker.setError();
     }
   }
-  fillLibrarySelects();
-
-  mainLibSelect.addEventListener('change', () => {
-    const path = mainLibSelect.value;
-    mainLibSelect.value = '';
-    if (!path) return;
-    if (AppState.mainSounds.length >= 3) {
-      toast('Main sound maksimal 3', 'error');
-      return;
-    }
-    setWorkspace(path);
-    AppState.mainSounds.push({ path, volume: 100 });
-    renderMainSoundsList();
-  });
-
-  optLibSelect.addEventListener('change', () => {
-    const opt = optLibSelect.selectedOptions[0];
-    const path = optLibSelect.value;
-    optLibSelect.value = '';
-    if (!path) return;
-    AppState.optionalSounds.push({
-      path,
-      duration: parseFloat(opt?.dataset.duration || 0),
-      volume: 80,
-      pan: 'center',
-      fade_in: 1.5,
-      fade_out: 1.5,
-      density: 'normal',
-      clip_size: 'medium',
-      window_start: 10,
-      window_end: 90,
-    });
-    renderOptionalList();
-  });
+  fillLibraryPickers();
 
   // ── Optional sounds ──────────────────────────────────────────
   AppState.optionalSounds = AppState.optionalSounds || [];
 
-  $('optAddSoundBtn')?.addEventListener('click', async () => {
+  $('optAddSoundBtn')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Upload…';
     try {
-      const path = await browseAudio();
+      const path = await uploadAudioFromDevice();
       if (!path) return;
       let dur = 0;
       try {
@@ -347,8 +335,12 @@ export function initSoundLayer() {
         window_end: 90,
       });
       renderOptionalList();
-    } catch (e) {
-      toast('Gagal menambah file: ' + e.message, 'error');
+      fillLibraryPickers(); // berkas baru ikut muncul di dropdown
+    } catch (err) {
+      toast('Gagal menambah file: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
     }
   });
 

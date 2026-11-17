@@ -157,6 +157,51 @@ export async function browseAudio() {
   return paths[0] || "";
 }
 
+export async function fetchServerFiles(kind) {
+  const res = await fetch(`${BASE}/api/library/files?kind=${kind}`);
+  if (!res.ok) throw new Error("Daftar berkas server tidak tersedia");
+  return await res.json();
+}
+
+// Upload-only: langsung buka file chooser perangkat, upload ke server,
+// resolve dengan path server-nya ("" = batal). Tanpa modal daftar berkas —
+// daftar berkasnya sudah ada di dropdown Pustaka Suara (panel Sound Layer).
+export function uploadAudioFromDevice() {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "audio/*";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    let done = false;
+    const finish = (fn, val) => {
+      if (done) return;
+      done = true;
+      input.remove();
+      fn(val);
+    };
+    input.addEventListener("cancel", () => finish(resolve, ""));
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      if (!file) return finish(resolve, "");
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch(`${BASE}/api/live/library/audio/add`, { method: "POST", body: fd });
+        const data = await res.json();
+        if (data.status !== "success") throw new Error(data.error || "Upload gagal");
+        const catalog = await fetchServerFiles("audio");
+        const hit = (catalog.groups || []).flatMap((g) => g.items).find((it) => it.name === data.filename);
+        if (!hit) throw new Error("Berkas terupload tapi tidak ditemukan di server");
+        finish(resolve, hit.path);
+      } catch (e) {
+        finish(reject, e);
+      }
+    });
+    input.click();
+  });
+}
+
 export async function fetchLibrarySounds() {
   const res = await fetch(`${BASE}/api/library/sounds`);
   if (!res.ok) throw new Error("Pustaka suara tidak tersedia");

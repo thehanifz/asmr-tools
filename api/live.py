@@ -35,6 +35,71 @@ if not os.path.exists(AUDIO_INDEX):
         json.dump([], f)
 
 
+# ── Persisted last-session config (resume after service restart) ──────────
+# SECURITY: this file holds the stream CONFIG ONLY (video/audio/quality/
+# RTMP URL). The stream key is NEVER written here, to any log, or to any
+# job record — the user re-enters it on resume. The dict below is built
+# from an explicit allowlist; the request payload is never dumped.
+LIVE_SESSION_FILE = os.environ.get(
+    "ASMR_LIVE_SESSION_FILE",
+    "/home/hatch/workspace/asmr-service/live-last-session.json",
+)
+
+
+def _save_live_session(status: str, config: dict, form: dict) -> None:
+    session = {
+        "status": status,  # live | stopped | dismissed
+        "config": {
+            "video_path": config.get("video_path", ""),
+            "audio_source": config.get("audio_source", ""),
+            "audio_path": config.get("audio_path", ""),
+            "quality": config.get("quality", ""),
+            "rtmp_url": config.get("rtmp_url", ""),
+        },
+        "form": {
+            "video_source": form.get("video_source", "local"),
+            "video_path": form.get("video_path", ""),
+            "audio_source": form.get("audio_source", ""),
+            "audio_path": form.get("audio_path", ""),
+            "quality": form.get("quality", ""),
+            "rtmp_url": form.get("rtmp_url", ""),
+        },
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    try:
+        os.makedirs(os.path.dirname(LIVE_SESSION_FILE), exist_ok=True)
+        tmp = f"{LIVE_SESSION_FILE}.tmp.{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(session, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, LIVE_SESSION_FILE)
+    except Exception as e:
+        print(f"[live] gagal menyimpan sesi terakhir: {e}", flush=True)
+
+
+def _load_live_session() -> dict | None:
+    try:
+        with open(LIVE_SESSION_FILE, encoding="utf-8") as f:
+            session = json.load(f)
+        return session if isinstance(session, dict) else None
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+
+
+def _mark_live_session(status: str) -> None:
+    session = _load_live_session()
+    if session is None:
+        return
+    session["status"] = status
+    session["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        tmp = f"{LIVE_SESSION_FILE}.tmp.{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(session, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, LIVE_SESSION_FILE)
+    except Exception as e:
+        print(f"[live] gagal memperbarui sesi terakhir: {e}", flush=True)
+
+
 def cleanup_zombie_process():
     if os.path.exists(PID_FILE):
         try:
@@ -544,7 +609,18 @@ async def start_live(request: Request, background_tasks: BackgroundTasks):
     state.stream_key = stream_key
     state.logs = []
     state.error_message = ""
-    
+
+    # Persist config (WITHOUT the key) so a restart-interrupted session
+    # can be resumed from the UI with the key re-entered by the user.
+    _save_live_session("live", config, {
+        "video_source": video_source,
+        "video_path": video_val,
+        "audio_source": audio_source,
+        "audio_path": audio_val,
+        "quality": quality,
+        "rtmp_url": rtmp_url,
+    })
+
     # Start reconnection background loop
     state.task = asyncio.create_task(stream_with_reconnect(config, stream_key))
     
@@ -590,7 +666,36 @@ async def stop_live():
     state.task = None
     state.start_time = None
     add_log(f"[{now_ts()}] Live streaming berhasil dihentikan.")
-    
+    _mark_live_session("stopped")
+
+    return {"status": "success"}
+
+
+@router.get("/last-session")
+async def last_session():
+    """Sesi live terakhir yang terhenti karena service dimulai ulang.
+
+    interrupted=True hanya bila file sesi berkata 'live' sementara state
+    saat ini idle (artinya proses lama mati tanpa /stop). Config yang
+    dikembalikan TIDAK PERNAH berisi stream key.
+    """
+    session = _load_live_session()
+    interrupted = (
+        session is not None
+        and session.get("status") == "live"
+        and state.status == "idle"
+    )
+    return {
+        "interrupted": interrupted,
+        "session": session if interrupted else None,
+        "state_status": state.status,
+    }
+
+
+@router.post("/dismiss-interrupted")
+async def dismiss_interrupted():
+    """Sembunyikan banner sesi terhenti (tidak menghapus config)."""
+    _mark_live_session("dismissed")
     return {"status": "success"}
 
 

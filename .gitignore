@@ -58,3 +58,20 @@ temp/
 # cache durasi ffprobe (dibuat runtime)
 .durations.json
 media/.durations.json
+
+# Sound library audio (local only, never pushed) — folder structure tracked via .gitkeep
+/library/**/*.mp3
+/library/**/*.wav
+/library/**/*.ogg
+/library/**/*.oga
+/library/**/*.flac
+/library/**/*.m4a
+/library/**/*.aac
+# Uploaded server audio (kept separate from the 169 library sounds; local only)
+/media/audio/*.mp3
+/media/audio/*.wav
+/media/audio/*.ogg
+/media/audio/*.oga
+/media/audio/*.flac
+/media/audio/*.m4a
+/media/audio/*.aac

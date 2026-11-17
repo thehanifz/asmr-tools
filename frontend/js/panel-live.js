@@ -490,6 +490,7 @@ export function initLive() {
       const data = await res.json();
       if (res.ok) {
         toast('Proses live stream sedang diinisialisasi...', 'success');
+        hideLiveResumeBanner();
         startSSEStatusListener();
       } else {
         toast(data.error || 'Gagal memulai streaming', 'error');
@@ -525,6 +526,138 @@ export function initLive() {
       $('btnLiveStop').innerHTML = '⏹ Hentikan Live';
     }
   });
+
+  // ── Sesi live terhenti (service dimulai ulang) ─────────────────
+  // Config sesi terakhir tersimpan di server TANPA stream key; banner ini
+  // mengisi ulang form dari config tersebut, pengguna memasukkan key-nya
+  // sekali, lalu stream jalan lewat alur start normal.
+  function hideLiveResumeBanner() {
+    document.getElementById('liveResumeBanner')?.remove();
+  }
+
+  function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function selectLibraryItem(listId, filename) {
+    const listEl = $(listId);
+    if (!listEl) return false;
+    const items = listEl.querySelectorAll('.library-item');
+    for (const el of items) {
+      const nameEl = el.querySelector('.library-name');
+      if (nameEl && nameEl.getAttribute('title') === filename) {
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async function prefillFromSession(form) {
+    // Video
+    const videoRadio = document.querySelector(`input[name="liveVideoSource"][value="${form.video_source || 'local'}"]`);
+    if (videoRadio) {
+      videoRadio.checked = true;
+      videoRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if ((form.video_source || 'local') === 'library') {
+      await _loadVideoLibrary();
+      if (!selectLibraryItem('liveVideoLibraryList', form.video_path)) {
+        toast('Video library sesi sebelumnya tidak ditemukan: ' + form.video_path, 'error');
+        return false;
+      }
+    } else if (form.video_path) {
+      $('liveVideoLocalInput').value = form.video_path;
+      setWorkspace(form.video_path);
+      selectedVideoPath = form.video_path;
+      const info = await probeFile(form.video_path);
+      if (info.error) {
+        toast(info.error, 'error');
+        return false;
+      }
+      videoHeight = info.height || 0;
+      _updateSelectedVideoInfo(form.video_path, true, info);
+    }
+    // Audio
+    const audioRadio = document.querySelector(`input[name="liveAudioSource"][value="${form.audio_source || 'video'}"]`);
+    if (audioRadio) {
+      audioRadio.checked = true;
+      audioRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (form.audio_source === 'library' && form.audio_path) {
+      await _loadAudioLibrary();
+      if (!selectLibraryItem('liveAudioLibraryList', form.audio_path)) {
+        toast('Audio library sesi sebelumnya tidak ditemukan: ' + form.audio_path, 'error');
+        return false;
+      }
+    }
+    // Kualitas (dropdown sudah dibangun ulang oleh probe/pilih video) + RTMP
+    const qSel = $('liveStreamQuality');
+    if (qSel && form.quality) {
+      const hasOption = [...qSel.options].some(o => o.value === form.quality);
+      if (hasOption) qSel.value = form.quality;
+    }
+    if (form.rtmp_url) $('liveRtmpUrl').value = form.rtmp_url;
+    return true;
+  }
+
+  async function checkInterruptedSession() {
+    let data;
+    try {
+      const res = await fetch('/api/live/last-session');
+      data = await res.json();
+    } catch (err) {
+      return;
+    }
+    if (!data.interrupted || !data.session) return;
+    const form = data.session.form || {};
+    const section = $('tool-live');
+    const header = section?.querySelector('.tool-header');
+    if (!section || !header || document.getElementById('liveResumeBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'liveResumeBanner';
+    banner.className = 'live-resume-banner';
+    const videoName = (form.video_path || '').split('/').pop() || '—';
+    const audioName = form.audio_source === 'library'
+      ? (form.audio_path || '').split('/').pop()
+      : (form.audio_source || 'video');
+    banner.innerHTML = `
+      <div class="live-resume-title">⚠️ Sesi live terhenti karena service dimulai ulang.</div>
+      <div class="live-resume-meta">Video: <b>${escHtml(videoName)}</b> · Audio: <b>${escHtml(audioName)}</b> · Kualitas: <b>${escHtml(form.quality || '—')}</b></div>
+      <div class="live-resume-row">
+        <input type="password" id="liveResumeKey" class="input" placeholder="Masukkan stream key YouTube, lalu klik Lanjutkan">
+        <button class="btn btn-primary" id="btnLiveResume" style="margin-top:0; white-space:nowrap;">▶ Lanjutkan Live</button>
+        <button class="btn btn-ghost" id="btnLiveResumeDismiss" style="margin-top:0;">Abaikan</button>
+      </div>
+      <div class="field-hint">Stream key tidak pernah disimpan — hanya dipakai untuk sesi ini.</div>`;
+    header.after(banner);
+    $('btnLiveResumeDismiss')?.addEventListener('click', async () => {
+      try { await fetch('/api/live/dismiss-interrupted', { method: 'POST' }); } catch (e) { /* abaikan */ }
+      hideLiveResumeBanner();
+    });
+    $('btnLiveResume')?.addEventListener('click', async () => {
+      const key = $('liveResumeKey').value.trim();
+      if (!key) {
+        toast('Masukkan stream key dulu', 'error');
+        $('liveResumeKey').focus();
+        return;
+      }
+      const btn = $('btnLiveResume');
+      btn.disabled = true;
+      btn.textContent = 'Memuat config...';
+      const ok = await prefillFromSession(form);
+      btn.disabled = false;
+      btn.textContent = '▶ Lanjutkan Live';
+      if (!ok) return;
+      $('liveStreamKey').value = key;
+      hideLiveResumeBanner();
+      $('btnLiveStart')?.click();
+    });
+  }
+
+  checkInterruptedSession();
 
   // Start status listener on mount to recover UI state on page refresh
   startSSEStatusListener();
