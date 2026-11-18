@@ -1,6 +1,6 @@
 """Central router — includes all sub-routers."""
 from fastapi import APIRouter
-from api import probe, browse, video, audio, merge, thumbnail, system, denoise, extract_audio, sound_layer, cleanup, concat, loop_ba, live, library, jobs
+from api import probe, browse, video, audio, merge, thumbnail, system, denoise, extract_audio, sound_layer, cleanup, concat, loop_ba, live, library, jobs, finishing
 
 router = APIRouter()
 
@@ -20,5 +20,6 @@ router.include_router(loop_ba.router)
 router.include_router(live.router)
 router.include_router(library.router)
 router.include_router(jobs.router)
+router.include_router(finishing.router)
 
 
