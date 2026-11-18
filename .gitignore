@@ -54,6 +54,7 @@ logs/
 tmp/
 temp/
 *.tmp
+*.zip
 
 # cache durasi ffprobe (dibuat runtime)
 .durations.json
@@ -67,6 +68,11 @@ media/.durations.json
 /library/**/*.flac
 /library/**/*.m4a
 /library/**/*.aac
+# Video produksi di media (lokal saja, ukuran GB — jangan pernah masuk git)
+/media/video/*.mp4
+/media/video/*.mkv
+/media/video/*.webm
+/media/video/thumbs/
 # Uploaded server audio (kept separate from the 169 library sounds; local only)
 /media/audio/*.mp3
 /media/audio/*.wav
