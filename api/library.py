@@ -114,7 +114,7 @@ def _scan_media(folder, exts, cache, cache_prefix):
 
 
 @router.get("/library/files")
-async def library_files(kind: str = "video"):
+async def library_files(kind: str = "video", src: str = "all"):
     """Server-side media catalog for the file picker (headless browse).
 
     kind=video -> media/video. kind=audio -> media/audio plus the
@@ -137,8 +137,9 @@ async def library_files(kind: str = "video"):
         if items:
             groups.append({"element": "media-audio",
                            "label": "Audio di Server", "items": items})
-        sounds = await library_sounds()
-        groups.extend(sounds.get("groups", []))
+        if src != "media":
+            sounds = await library_sounds()
+            groups.extend(sounds.get("groups", []))
     if dirty:
         try:
             with open(MEDIA_CACHE_FILE, "w", encoding="utf-8") as f:
@@ -146,6 +147,31 @@ async def library_files(kind: str = "video"):
         except Exception:
             pass
     return {"groups": groups, "kind": kind}
+
+
+@router.delete("/library/files")
+async def library_delete_file(path: str):
+    """Hapus permanen satu berkas dari folder media/ (upload / hasil proses).
+
+    Hanya berkas di dalam media/ yang boleh dihapus lewat UI — pustaka
+    suara elemen (library/) sengaja tidak bisa dihapus dari sini.
+    """
+    media_root = os.path.realpath(os.path.join(REPO_ROOT, "media"))
+    full = os.path.realpath(path)
+    if not full.startswith(media_root + os.sep):
+        return JSONResponse(
+            {"error": "Hanya berkas di folder media yang bisa dihapus"},
+            status_code=403)
+    if not os.path.isfile(full):
+        return JSONResponse({"error": "Berkas tidak ditemukan"}, status_code=404)
+    ext = os.path.splitext(full)[1].lower()
+    if ext not in VIDEO_EXTS | AUDIO_EXTS:
+        return JSONResponse({"error": "Bukan berkas media"}, status_code=400)
+    try:
+        os.remove(full)
+    except Exception as e:
+        return JSONResponse({"error": f"Gagal menghapus: {e}"}, status_code=500)
+    return {"status": "success", "deleted": full}
 
 
 @router.get("/library/stream")

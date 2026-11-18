@@ -17,7 +17,7 @@ export function initThumbnail() {
     $("thumbOutput").value = buildOutputPath(path, "_thumb", ".jpg");
     const info = await probeFile(path);
     if (!info.error) {
-      showFileInfo("thumbInfo", info);
+      showFileInfo("thumbInfo", info, path);
       videoDuration = info.duration || 5.0;
     }
   }

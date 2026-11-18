@@ -22,7 +22,7 @@ export function initDenoise() {
     AppState.audioOriginalPath = path;
     $("denoiseOutput").value = buildOutputPath(path, "._denoised", ".wav");
     const info = await probeFile(path);
-    if (!info.error) showFileInfo("denoiseInfo", info);
+    if (!info.error) showFileInfo("denoiseInfo", info, path);
   });
 
   // ── Process ─────────────────────────────────

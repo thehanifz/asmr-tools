@@ -25,7 +25,7 @@ export function initExtract() {
     const fmt = $("extractFormat").value || "mp3";
     $("extractOutput").value = buildOutputPath(path, "_audio", "." + fmt);
     const info = await probeFile(path);
-    if (!info.error) showFileInfo("extractInfo", info);
+    if (!info.error) showFileInfo("extractInfo", info, path);
   });
 
   // ── Browse Output ────────────────────────────

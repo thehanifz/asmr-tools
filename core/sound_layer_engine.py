@@ -906,9 +906,20 @@ class SoundLayerEngine:
         xfade = min(self.config.loop_xfade, target_dur * 0.4)
             
         # Add main sound inputs
-        # Loop main sounds endlessly, they will be trimmed by atrim
-        for main_sound in self.config.main_sounds:
-            cmd.extend(["-stream_loop", "-1", "-i", main_sound["path"]])
+        # Loop main sounds endlessly, they will be trimmed by atrim.
+        # Looping happens in the filter with aloop (sample-exact);
+        # -stream_loop on Vorbis inputs loses 128 samples per restart
+        # and makes long renders finish short — it is only a fallback
+        # for sounds whose sample count cannot be probed.
+        from core.runners import probe_sample_count
+        main_sample_counts = [
+            probe_sample_count(ms["path"]) for ms in self.config.main_sounds
+        ]
+        for i, main_sound in enumerate(self.config.main_sounds):
+            if main_sample_counts[i]:
+                cmd.extend(["-i", main_sound["path"]])
+            else:
+                cmd.extend(["-stream_loop", "-1", "-i", main_sound["path"]])
             
         # Build map of unique source files to input indices
         unique_sources = {}
@@ -984,8 +995,11 @@ class SoundLayerEngine:
             vol = ms.get("volume", 100) / 100.0
             
             # Trim to target duration, reset pts, apply fade out, apply volume
-            chain = (
-                f"[{i}:a]atrim=duration={target_dur:.3f},asetpts=PTS-STARTPTS,"
+            chain = f"[{i}:a]"
+            if main_sample_counts[i]:
+                chain += f"aloop=loop=-1:size={main_sample_counts[i]},"
+            chain += (
+                f"atrim=duration={target_dur:.3f},asetpts=PTS-STARTPTS,"
                 f"afade=t=out:st={target_dur - xfade:.3f}:d={xfade:.3f}"
             )
             if vol != 1.0:

@@ -13,6 +13,7 @@ const TYPE_PANEL = {
   'audio-loop': null, // tidak ada panel audio-loop; hanya tampil di daftar Jobs
 };
 const RESUMABLE = new Set(['interrupted', 'error', 'cancelled']);
+const ACTIVE = new Set(['running', 'queued']);
 const STATUS_LABEL = {
   queued: 'Antre',
   running: 'Berjalan',
@@ -164,7 +165,10 @@ function renderPanelBanners() {
 function renderNavBadge() {
   const badge = document.getElementById('jobsBadge');
   if (!badge) return;
-  const n = jobsCache.filter(j => RESUMABLE.has(j.status)).length;
+  // Lencana Jobs = jumlah job yang SEDANG berjalan/antre. Job yang
+  // terhenti (bisa dilanjutkan) disorot lewat banner panel dan panel
+  // Jobs itu sendiri, bukan dihitung di sini.
+  const n = jobsCache.filter(j => ACTIVE.has(j.status)).length;
   badge.textContent = String(n);
   badge.classList.toggle('hidden', n === 0);
 }

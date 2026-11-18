@@ -72,7 +72,7 @@ export function initAudio() {
       syncOutputExt();
       try {
         const info = await probeFile(path);
-        if (info && !info.error) showFileInfo('audioInfo', info);
+        if (info && !info.error) showFileInfo('audioInfo', info, path);
       } catch (_) {}
     } catch (e) {
       console.error('[audioBrowse]', e);

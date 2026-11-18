@@ -2,7 +2,7 @@
 //  Panel: Sound Layer — Per-Sound Smart Density
 // ═══════════════════════════════════════════════════════════════
 import { AppState, setWorkspace } from './state.js';
-import { uploadAudioFromDevice, fetchServerFiles, probeFile, previewSoundLayer } from './api.js';
+import { browseAudioMedia, fetchServerFiles, probeFile, previewSoundLayer } from './api.js';
 import { createSoundPicker } from './sound-picker.js';
 import { toast, logClear, logAppend, consumeSSE } from './ui.js';
 
@@ -48,14 +48,41 @@ function buildSoundItem(sound, idx, onRemove) {
       <span class="opt-sound-est" id="optEst_${idx}"></span>
       <button class="btn btn-ghost opt-remove-btn" title="Hapus" style="color:var(--danger);padding:2px 6px;margin-left:4px;">×</button>
     </div>
-    <div class="opt-sound-body collapsed">
-      ${previewHtml(sound.path) ? `<div class="opt-row" style="align-items:center;"><label class="opt-label">Preview</label><div style="flex:1;">${previewHtml(sound.path)}</div></div>` : ''}
-      <!-- Volume -->
-      <div class="opt-row">
-        <label class="opt-label">Volume</label>
-        <input type="range" class="slider opt-volume" min="0" max="100" value="${sound.volume}">
-        <span class="opt-vol-val">${sound.volume}%</span>
+    <!-- Volume selalu terlihat (di luar lipatan pengaturan lanjutan) -->
+    <div class="opt-row" style="padding:2px 10px 8px;">
+      <label class="opt-label">Volume</label>
+      <input type="range" class="slider opt-volume" min="0" max="100" value="${sound.volume}">
+      <span class="opt-vol-val">${sound.volume}%</span>
+    </div>
+    <!-- Mode penempatan: otomatis vs atur sendiri -->
+    <div class="opt-row" style="padding:0 10px 8px;align-items:center;">
+      <label class="opt-label">Penempatan</label>
+      <div style="display:flex;gap:6px;">
+        <button type="button" class="btn btn-ghost opt-mode-btn" data-mode="auto" style="padding:4px 10px;font-size:12px;">Otomatis</button>
+        <button type="button" class="btn btn-ghost opt-mode-btn" data-mode="manual" style="padding:4px 10px;font-size:12px;">Atur Sendiri</button>
       </div>
+    </div>
+    <!-- Panel atur sendiri -->
+    <div class="opt-manual" style="display:none;padding:0 10px 6px;">
+      <div class="opt-row">
+        <label class="opt-label">Mulai di</label>
+        <input type="number" class="input opt-mstart-v" min="0" step="1" style="width:70px;">
+        <select class="input opt-mstart-u" style="width:84px;"><option value="60">menit</option><option value="1">detik</option></select>
+        <span class="opt-unit">dari awal video</span>
+      </div>
+      <div class="opt-row">
+        <label class="opt-label">Ulangi tiap</label>
+        <input type="number" class="input opt-mint-v" min="0" step="1" style="width:70px;">
+        <select class="input opt-mint-u" style="width:84px;"><option value="60">menit</option><option value="1">detik</option></select>
+      </div>
+      <div class="opt-row">
+        <label class="opt-label">Durasi muncul</label>
+        <input type="number" class="input opt-mdur" min="1" step="1" style="width:70px;">
+        <span class="opt-unit">detik${sound.duration ? ` (isi file ${Math.round(sound.duration)} dtk)` : ''}</span>
+      </div>
+      <div class="opt-manual-summary" style="font-size:12px;color:var(--text-muted,#8a90a0);padding:2px 0;"></div>
+    </div>
+    <div class="opt-sound-body collapsed">
       <!-- Pan (posisi stereo, ala qipadd) -->
       <div class="opt-row">
         <label class="opt-label">Pan</label>
@@ -129,6 +156,8 @@ function buildSoundItem(sound, idx, onRemove) {
   }
 
   function updateEst() {
+    const s = AppState.optionalSounds[parseInt(div.dataset.idx)];
+    if (s && s.placement_mode === 'manual') { updateManualSummary(); return; }
     const targetDur = parseFloat($('soundLayerTargetDuration')?.value) || 3600;
     const { density, clip_size, wStart, wEnd } = getState();
     const windowSec = ((wEnd - wStart) / 100) * targetDur;
@@ -149,6 +178,10 @@ function buildSoundItem(sound, idx, onRemove) {
     s.fade_in   = parseFloat(div.querySelector('.opt-fadein').value);
     s.fade_out  = parseFloat(div.querySelector('.opt-fadeout').value);
     s.pan       = div.querySelector('.opt-pan')?.value || 'center';
+    const man = readManual();
+    s.manual_start    = man.start;
+    s.manual_interval = man.interval;
+    s.manual_duration = man.duration;
     updateEst();
   }
 
@@ -158,6 +191,7 @@ function buildSoundItem(sound, idx, onRemove) {
   volSlider.addEventListener('input', () => {
     volVal.textContent = volSlider.value + '%';
     syncToState();
+    window.__slRealtimeSetVolume?.('opt', parseInt(div.dataset.idx), parseInt(volSlider.value));
   });
 
   div.querySelectorAll('.opt-fadein, .opt-fadeout, .opt-wstart, .opt-wend').forEach(el => {
@@ -168,7 +202,64 @@ function buildSoundItem(sound, idx, onRemove) {
     el.addEventListener('change', syncToState);
   });
 
-  updateEst();
+  // ── Mode penempatan: Otomatis vs Atur Sendiri ──────────────────
+  function toInput(sec) {
+    sec = Math.max(0, Math.round(sec || 0));
+    return (sec >= 60 && sec % 60 === 0) ? { v: sec / 60, u: '60' } : { v: sec, u: '1' };
+  }
+  function readManual() {
+    const g = (vSel, uSel) => Math.max(0, parseFloat(div.querySelector(vSel)?.value) || 0) * parseFloat(div.querySelector(uSel)?.value || '1');
+    return {
+      start:    g('.opt-mstart-v', '.opt-mstart-u'),
+      interval: Math.max(1, g('.opt-mint-v', '.opt-mint-u')),
+      duration: Math.max(1, parseFloat(div.querySelector('.opt-mdur')?.value) || 1),
+    };
+  }
+  function fmtTime(sec) {
+    sec = Math.max(0, Math.round(sec || 0));
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+  function updateManualSummary() {
+    const s = AppState.optionalSounds[parseInt(div.dataset.idx)];
+    const sum = div.querySelector('.opt-manual-summary');
+    if (!s) return;
+    const targetDur = parseFloat($('soundLayerTargetDuration')?.value) || 3600;
+    const cap = s.duration > 0 ? s.duration : Infinity;
+    const dur = Math.min(s.manual_duration || 20, cap);
+    let n = 0;
+    for (let t = (s.manual_start || 0); t + dur <= targetDur && n < 2000; t += Math.max(1, s.manual_interval || 600)) n++;
+    if (sum) sum.textContent = `Muncul pertama di ${fmtTime(s.manual_start || 0)}, lalu tiap ${fmtTime(s.manual_interval || 600)}, masing-masing ${Math.round(dur)} dtk → ±${n} kali dalam ${fmtTime(targetDur)}.`;
+    const est = $(`optEst_${idx}`);
+    if (est) est.textContent = `±${n}x`;
+  }
+  function applyMode(mode) {
+    const s = AppState.optionalSounds[parseInt(div.dataset.idx)];
+    if (s) s.placement_mode = mode;
+    div.querySelectorAll('.opt-mode-btn').forEach(b => {
+      const on = b.dataset.mode === mode;
+      b.style.background  = on ? 'var(--accent,#f97316)' : '';
+      b.style.color       = on ? '#fff' : '';
+      b.style.borderColor = on ? 'transparent' : '';
+    });
+    div.querySelector('.opt-manual').style.display = mode === 'manual' ? '' : 'none';
+    body.style.display = mode === 'manual' ? 'none' : '';
+    if (mode === 'manual') updateManualSummary(); else updateEst();
+  }
+
+  const msI = toInput(sound.manual_start ?? 300);
+  const miI = toInput(sound.manual_interval ?? 600);
+  div.querySelector('.opt-mstart-v').value = msI.v;
+  div.querySelector('.opt-mstart-u').value = msI.u;
+  div.querySelector('.opt-mint-v').value   = miI.v;
+  div.querySelector('.opt-mint-u').value   = miI.u;
+  div.querySelector('.opt-mdur').value     = sound.manual_duration ?? 20;
+  div.querySelectorAll('.opt-mode-btn').forEach(b =>
+    b.addEventListener('click', () => { applyMode(b.dataset.mode); syncToState(); }));
+  div.querySelectorAll('.opt-mstart-v, .opt-mstart-u, .opt-mint-v, .opt-mint-u, .opt-mdur')
+    .forEach(el => el.addEventListener('input', syncToState));
+
+  applyMode(sound.placement_mode || 'auto');
   return div;
 }
 
@@ -203,27 +294,28 @@ export function initSoundLayer() {
       const div = document.createElement('div');
       div.className = 'file-row';
       div.style.cssText = 'flex-direction:column;align-items:stretch;gap:8px;padding:10px;background:var(--bg-hover);border-radius:6px;';
+      const name = snd.path.split(/[\\/\\\\]/).pop();
       div.innerHTML = `
         <div style="display:flex;gap:8px;align-items:center;">
-          <input type="text" class="file-input" value="${snd.path}" readonly style="flex:1;">
+          <span title="${snd.path}" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">🎵 ${name}</span>
           <button class="btn btn-ghost" style="color:var(--danger);" data-idx="${idx}">Hapus</button>
         </div>
         <div style="display:flex;gap:12px;align-items:center;">
           <label style="font-size:12px;min-width:50px;">Volume</label>
           <input type="range" class="slider vol-slider" data-idx="${idx}" min="0" max="100" value="${snd.volume}" style="flex:1;">
-          <span style="font-family:var(--font-mono);font-size:12px;width:40px;text-align:right;">${snd.volume}%</span>
+          <span class="vol-val" style="font-family:var(--font-mono);font-size:12px;width:40px;text-align:right;">${snd.volume}%</span>
         </div>
-        ${previewHtml(snd.path)}
       `;
       div.querySelector('.btn-ghost').addEventListener('click', (e) => {
         AppState.mainSounds.splice(parseInt(e.currentTarget.dataset.idx), 1);
         renderMainSoundsList();
       });
       const vs = div.querySelector('.vol-slider');
-      const vt = div.querySelector('span');
+      const vt = div.querySelector('.vol-val');
       vs.addEventListener('input', () => {
         vt.textContent = vs.value + '%';
         AppState.mainSounds[parseInt(vs.dataset.idx)].volume = parseInt(vs.value);
+        window.__slRealtimeSetVolume?.('main', parseInt(vs.dataset.idx), parseInt(vs.value));
       });
       list.appendChild(div);
     });
@@ -234,16 +326,16 @@ export function initSoundLayer() {
     const btn = e.currentTarget;
     const orig = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '⏳ Upload…';
+    btn.textContent = '⏳ Memuat…';
     try {
-      const path = await uploadAudioFromDevice();
+      const path = await browseAudioMedia();
       if (!path) return;
       setWorkspace(path);
       AppState.mainSounds.push({ path, volume: 100 });
       renderMainSoundsList();
       fillLibraryPickers(); // berkas baru ikut muncul di dropdown
     } catch (err) {
-      toast('Upload gagal: ' + err.message, 'error');
+      toast('Gagal menambah file: ' + err.message, 'error');
     } finally {
       btn.disabled = AppState.mainSounds.length >= 3;
       btn.textContent = orig;
@@ -283,6 +375,10 @@ export function initSoundLayer() {
         clip_size: 'medium',
         window_start: 10,
         window_end: 90,
+        placement_mode: 'auto',
+        manual_start: 300,
+        manual_interval: 600,
+        manual_duration: 20,
       });
       renderOptionalList();
     },
@@ -313,9 +409,9 @@ export function initSoundLayer() {
     const btn = e.currentTarget;
     const orig = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '⏳ Upload…';
+    btn.textContent = '⏳ Memuat…';
     try {
-      const path = await uploadAudioFromDevice();
+      const path = await browseAudioMedia();
       if (!path) return;
       let dur = 0;
       try {
@@ -333,6 +429,10 @@ export function initSoundLayer() {
         clip_size: 'medium',
         window_start: 10,
         window_end: 90,
+        placement_mode: 'auto',
+        manual_start: 300,
+        manual_interval: 600,
+        manual_duration: 20,
       });
       renderOptionalList();
       fillLibraryPickers(); // berkas baru ikut muncul di dropdown
@@ -354,8 +454,22 @@ export function initSoundLayer() {
       const wStart    = parseFloat(el.querySelector('.opt-wstart')?.value) || 0;
       const wEnd      = parseFloat(el.querySelector('.opt-wend')?.value)   || 100;
       const targetDur = parseFloat($('soundLayerTargetDuration')?.value) || 3600;
-      const windowSec = ((wEnd - wStart) / 100) * targetDur;
       const est = $(`optEst_${idx}`);
+      const s = AppState.optionalSounds[idx];
+      if (s && s.placement_mode === 'manual') {
+        const cap = s.duration > 0 ? s.duration : Infinity;
+        const dur = Math.min(s.manual_duration || 20, cap);
+        let n = 0;
+        for (let t = (s.manual_start || 0); t + dur <= targetDur && n < 2000; t += Math.max(1, s.manual_interval || 600)) n++;
+        if (est) est.textContent = `±${n}x`;
+        const sum = el.querySelector('.opt-manual-summary');
+        if (sum) {
+          const ft = (sec) => { sec = Math.max(0, Math.round(sec || 0)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+          sum.textContent = `Muncul pertama di ${ft(s.manual_start || 0)}, lalu tiap ${ft(s.manual_interval || 600)}, masing-masing ${Math.round(dur)} dtk → ±${n} kali dalam ${ft(targetDur)}.`;
+        }
+        return;
+      }
+      const windowSec = ((wEnd - wStart) / 100) * targetDur;
       if (est) est.textContent = `~${calcOccurrences(windowSec, density, clip_size)}x`;
     });
   });
@@ -394,6 +508,10 @@ export function initSoundLayer() {
         time_window_end:   (s.window_end   / 100) * targetDuration,
         min_gap: 0,
         overlap_mode: 'full',
+        placement_mode: s.placement_mode || 'auto',
+        manual_start: s.manual_start ?? 300,
+        manual_interval: s.manual_interval ?? 600,
+        manual_duration: s.manual_duration ?? 20,
       };
     });
 
@@ -520,4 +638,80 @@ export function initSoundLayer() {
       btn.textContent = orig;
     }
   }
+
+  // ── Preview Realtime (Web Audio — streaming, tanpa render) ────
+  // Semua main sound + backsound diputar barengan sebagai loop dari
+  // browser. Slider volume tiap track langsung mengubah gain yang
+  // sedang berputar lewat window.__slRealtimeSetVolume.
+  const rt = { ctx: null, nodes: [], playing: false };
+  const rtDefaultStatus = 'Preview realtime: semua main sound + backsound diputar barengan langsung dari browser (streaming, tanpa render). Geser slider volume tiap track — perubahannya langsung terdengar. Optional sound diputar loop untuk cek blend; di render asli ia muncul berkala. Kalau tambah/hapus track, Stop lalu Putar lagi.';
+  const rtStatus = (msg) => { const el = $('slRealtimeStatus'); if (el) el.textContent = msg; };
+
+  function rtCollect() {
+    const tracks = [];
+    (AppState.mainSounds || []).forEach((s, i) => {
+      if (s.path) tracks.push({ kind: 'main', idx: i, path: s.path, volume: s.volume ?? 100, pan: 0 });
+    });
+    (AppState.optionalSounds || []).forEach((s, i) => {
+      if (s.path) tracks.push({ kind: 'opt', idx: i, path: s.path, volume: s.volume ?? 80,
+        pan: s.pan === 'left' ? -0.6 : s.pan === 'right' ? 0.6 : 0 });
+    });
+    return tracks;
+  }
+
+  function rtStop() {
+    rt.nodes.forEach(n => { try { n.src.stop(); } catch (_) {} });
+    rt.nodes = [];
+    if (rt.ctx) { rt.ctx.close().catch(() => {}); rt.ctx = null; }
+    rt.playing = false;
+    const pb = $('slRealtimePlayBtn'), sb = $('slRealtimeStopBtn');
+    if (pb) { pb.disabled = false; pb.textContent = '▶ Preview Realtime'; }
+    if (sb) sb.disabled = true;
+  }
+
+  window.__slRealtimeSetVolume = (kind, idx, vol) => {
+    const n = rt.nodes.find(x => x.kind === kind && x.idx === idx);
+    if (n && rt.ctx) n.gain.gain.setTargetAtTime((vol || 0) / 100, rt.ctx.currentTime, 0.03);
+  };
+
+  $('slRealtimePlayBtn')?.addEventListener('click', async () => {
+    const pb = $('slRealtimePlayBtn'), sb = $('slRealtimeStopBtn');
+    if (rt.playing && rt.ctx) {
+      if (rt.ctx.state === 'running') { await rt.ctx.suspend(); pb.textContent = '▶ Lanjut Putar'; rtStatus('Preview realtime dijeda.'); }
+      else { await rt.ctx.resume(); pb.textContent = '⏸ Jeda'; rtStatus('▶ Preview realtime berputar…'); }
+      return;
+    }
+    const tracks = rtCollect();
+    if (!tracks.length) { toast('Tambah minimal 1 main sound atau backsound dulu', 'error'); return; }
+    rtStop();
+    pb.disabled = true; pb.textContent = '⏳ Memuat…';
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      rt.ctx = ctx;
+      const master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+      rtStatus(`Memuat ${tracks.length} track…`);
+      for (const t of tracks) {
+        const res = await fetch(`/api/sound-layer/play?path=${encodeURIComponent(t.path)}`);
+        if (!res.ok) throw new Error('Gagal memuat ' + t.path.split('/').pop());
+        const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+        const gain = ctx.createGain(); gain.gain.value = (t.volume || 0) / 100;
+        const panner = ctx.createStereoPanner(); panner.pan.value = t.pan || 0;
+        src.connect(gain); gain.connect(panner); panner.connect(master);
+        rt.nodes.push({ ...t, src, gain });
+      }
+      const t0 = ctx.currentTime + 0.05;
+      rt.nodes.forEach(n => n.src.start(t0));
+      rt.playing = true;
+      pb.disabled = false; pb.textContent = '⏸ Jeda';
+      if (sb) sb.disabled = false;
+      rtStatus(`▶ Memutar ${rt.nodes.length} track barengan. Geser slider volume tiap track — langsung terdengar.`);
+    } catch (e) {
+      rtStop();
+      rtStatus(rtDefaultStatus);
+      toast('Preview realtime gagal: ' + e.message, 'error');
+    }
+  });
+
+  $('slRealtimeStopBtn')?.addEventListener('click', () => { rtStop(); rtStatus('Preview realtime berhenti.'); });
 }

@@ -4,7 +4,7 @@ import json
 import asyncio
 from fastapi import APIRouter, Request, Query, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
-from core.sound_layer_engine import LayerConfig, SoundLayerEngine, PlacementPlan
+from core.sound_layer_engine import LayerConfig, SoundLayerEngine, PlacementPlan, Placement
 from api.utils import run_ffmpeg_stream
 
 router = APIRouter(prefix="/sound-layer", tags=["sound-layer"])
@@ -67,15 +67,44 @@ async def preview_placement(request: Request):
                 silence_threshold=-50.0,
             )
 
+            fi = float(snd.get("fade_in", 1.5))
+            fo = float(snd.get("fade_out", 1.5))
+            vol = int(snd.get("volume", 80))
+            pan = snd.get("pan", "center")
+
+            # Mode manual: penempatan deterministik dari pengaturan
+            # pengguna (mulai di, ulangi tiap, durasi muncul) — tanpa
+            # acak. Mesin hanya dipakai untuk deteksi hening/durasi.
+            if snd.get("placement_mode") == "manual":
+                eng = SoundLayerEngine(config)
+                eng.optional_sound_files = [path]
+                try:
+                    t_start, t_end = await eng.detect_silence_cached(path)
+                    src_dur = await eng.get_audio_duration(path)
+                except Exception:
+                    t_start, t_end, src_dur = 0.0, 0.0, 0.0
+                avail = max(0.0, src_dur - t_start - t_end)
+                dur = float(snd.get("manual_duration", 20.0))
+                if avail > 0:
+                    dur = min(dur, avail)
+                start = max(0.0, float(snd.get("manual_start", 0.0)))
+                interval = max(1.0, float(snd.get("manual_interval", 600.0)))
+                t = start
+                count = 0
+                while t + dur <= target_duration and count < 2000:
+                    all_placements.append(Placement(
+                        source_file=path, start_time=t, duration=dur,
+                        fade_in=fi, fade_out=fo, trimmed_start=t_start,
+                        trimmed_end=t_end, volume=vol, pan=pan))
+                    t += interval
+                    count += 1
+                continue
+
             engine = SoundLayerEngine(config)
             engine.optional_sound_files = [path]
             plan = await engine.generate_placement_plan()
 
             # Patch fade_in / fade_out / volume / pan individually per placement
-            fi = float(snd.get("fade_in", 1.5))
-            fo = float(snd.get("fade_out", 1.5))
-            vol = int(snd.get("volume", 80))
-            pan = snd.get("pan", "center")
             for p in plan.placements:
                 p.fade_in  = fi
                 p.fade_out = fo

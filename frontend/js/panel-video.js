@@ -86,7 +86,7 @@ export function initVideo() {
     $('videoOutput').value = buildOutputPath(path, '._looped', '.mp4');
     const info = await probeFile(path);
     if (info.error) { toast(info.error, 'error'); return; }
-    showFileInfo('videoInfo', info);
+    showFileInfo('videoInfo', info, path);
     AppState.videoDuration = info.duration || 8;
   }
 

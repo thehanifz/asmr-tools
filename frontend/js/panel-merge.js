@@ -185,15 +185,58 @@ export function initMerge() {
       "/api/merge", payload,
       "mergeLog", "mergeProgressWrap", "mergeProgressFill", "mergeProgressLabel"
     );
-    $("mergeProcess").disabled = false;
 
-    if (ok) {
-      AppState.mergeFinalPath = output;
-      toast(`Merge selesai · ${finalData?.size || ""}`, "success");
-      document.querySelector('.nav-item[data-tool="merge"]')?.classList.add("done");
-      showMergeResult(output);
-    } else {
+    if (!ok) {
+      $("mergeProcess").disabled = false;
       toast("Merge gagal", "error");
+      return;
     }
+
+    AppState.mergeFinalPath = output;
+    toast(`Merge selesai · ${finalData?.size || ""}`, "success");
+    document.querySelector('.nav-item[data-tool="merge"]')?.classList.add("done");
+    showMergeResult(output);
+
+    // Finishing opsional: intro card + fade + thumbnail, jalan otomatis
+    // setelah merge bila dicentang (standar channel Extra Dimension).
+    if ($("finEnable")?.checked) {
+      const finPayload = {
+        input: output,
+        audio_path: layers[0]?.path || "",
+        scene_title: $("finSceneTitle").value.trim(),
+        sound_line: $("finSoundLine").value.trim(),
+        thumb_title: $("finThumbTitle").value.trim(),
+        make_thumbnail: true,
+      };
+      const fin = await consumeSSE(
+        "/api/finishing", finPayload,
+        "mergeLog", "mergeProgressWrap", "mergeProgressFill", "mergeProgressLabel"
+      );
+      if (fin.ok && fin.finalData?.output) {
+        AppState.mergeFinalPath = fin.finalData.output;
+        toast(`Finishing selesai · ${fin.finalData.size || ""}`, "success");
+        showMergeResult(fin.finalData.output);
+        const thumb = fin.finalData.thumbnail;
+        if (thumb) {
+          const url = mediaUrl(thumb);
+          if (url) {
+            $("finThumbPreview").src = url;
+            const dl = $("finThumbDownload");
+            dl.href = url + "&dl=1";
+            dl.setAttribute("download", thumb.split(/[\\/]/).pop() || "thumbnail.jpg");
+            $("finThumbName").textContent = thumb.split(/[\\/]/).pop() || "";
+            $("finResult").style.display = "block";
+          }
+        }
+      } else {
+        toast("Finishing gagal — hasil merge tetap tersimpan", "error");
+      }
+    }
+    $("mergeProcess").disabled = false;
+  });
+
+  // Tampilkan/sembunyikan kolom finishing
+  $("finEnable")?.addEventListener("change", () => {
+    $("finFields").style.display = $("finEnable").checked ? "block" : "none";
   });
 }

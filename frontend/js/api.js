@@ -50,7 +50,7 @@ function _ensurePickerDom() {
   return overlay;
 }
 
-function pickServerFiles(kind, multi = false) {
+function pickServerFiles(kind, multi = false, src = "all") {
   return new Promise((resolve) => {
     const overlay = _ensurePickerDom();
     const listEl = overlay.querySelector("#spList");
@@ -76,7 +76,7 @@ function pickServerFiles(kind, multi = false) {
       listEl.innerHTML = '<div style="color:var(--text-muted,#8a90a0);padding:8px 0;">Memuat daftar berkas…</div>';
       let data;
       try {
-        const res = await fetch(`${BASE}/api/library/files?kind=${kind}`);
+        const res = await fetch(`${BASE}/api/library/files?kind=${kind}&src=${src}`);
         data = await res.json();
       } catch (e) {
         listEl.innerHTML = `<div style="color:#f66;padding:8px 0;">Gagal memuat daftar: ${e.message}</div>`;
@@ -99,6 +99,29 @@ function pickServerFiles(kind, multi = false) {
           const meta = [item.duration ? _fmtDur(item.duration) : null,
                         item.size_mb ? `${item.size_mb} MB` : null].filter(Boolean).join(" · ");
           row.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${multi ? "☐ " : ""}${item.name}</span><span style="color:var(--text-muted,#8a90a0);white-space:nowrap;">${meta}</span>`;
+          // Tombol hapus hanya untuk berkas di folder media/ (upload &
+          // hasil proses). Elemen pustaka suara tidak ditawari hapus.
+          if (g.element === "media-video" || g.element === "media-audio") {
+            const del = document.createElement("button");
+            del.type = "button";
+            del.textContent = "🗑";
+            del.title = "Hapus berkas dari server";
+            del.style.cssText = "background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;flex:none;color:inherit;";
+            del.addEventListener("click", async (ev) => {
+              ev.stopPropagation();
+              if (!confirm(`Hapus permanen "${item.name}" dari server?`)) return;
+              try {
+                const res = await fetch(`${BASE}/api/library/files?path=${encodeURIComponent(item.path)}`, { method: "DELETE" });
+                const d = await res.json();
+                if (!res.ok || d.error) throw new Error(d.error || "Gagal menghapus");
+                selected.delete(item.path);
+                load();
+              } catch (e) {
+                alert(`Gagal menghapus: ${e.message}`);
+              }
+            });
+            row.appendChild(del);
+          }
           const mark = () => {
             const on = selected.has(item.path);
             row.style.borderColor = on ? "var(--accent,#f97316)" : "var(--border,#333a45)";
@@ -154,6 +177,13 @@ export async function browseVideo() {
 
 export async function browseAudio() {
   const paths = await pickServerFiles("audio", false);
+  return paths[0] || "";
+}
+
+// Hanya berkas di folder media (upload & hasil proses), tanpa grup
+// Pustaka Suara — untuk tombol "Dari Server" di panel Sound Layer.
+export async function browseAudioMedia() {
+  const paths = await pickServerFiles("audio", false, "media");
   return paths[0] || "";
 }
 

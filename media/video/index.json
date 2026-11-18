@@ -31,5 +31,16 @@
     "size_str": "5.1 MB",
     "thumbnail": "media/video/thumbs/Rain_falling_in_garden_7f0c1a96_720p.jpg",
     "has_audio": true
+  },
+  {
+    "filename": "Waterfall_flowing_in_forest_a082f2b6.mp4",
+    "title": "Waterfall_flowing_in_forest_a082f2b6",
+    "duration": 15.04,
+    "width": 1280,
+    "height": 720,
+    "size": 9404657,
+    "size_str": "9.0 MB",
+    "thumbnail": "media/video/thumbs/Waterfall_flowing_in_forest_a082f2b6.jpg",
+    "has_audio": true
   }
 ]

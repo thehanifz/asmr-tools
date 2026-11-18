@@ -31,7 +31,7 @@ export function initLoopBA() {
         return;
       }
 
-      showFileInfo('loopBaInfo', info);
+      showFileInfo('loopBaInfo', info, path);
 
       // Store video properties
       AppState.loopBaOriginalPath = path;

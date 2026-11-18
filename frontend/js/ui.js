@@ -55,7 +55,7 @@ export function progressHide(wrapId) {
 }
 
 // ── File info badge ──────────────────────────────
-export function showFileInfo(infoId, info) {
+export function showFileInfo(infoId, info, path = "") {
   const el = document.getElementById(infoId);
   if (!el) return;
   const parts = [];
@@ -72,6 +72,21 @@ export function showFileInfo(infoId, info) {
     `<span>${p}</span>`
   ).join(" · ");
   el.classList.add("visible");
+
+  // Preview player di bawah info berkas. Stream endpoint hanya
+  // melayani berkas di folder media/, jadi path di luar itu aman
+  // (server menolaknya) — player cukup tidak akan bisa memutar.
+  if (path && (info.has_video || info.has_audio)) {
+    const src = `/api/library/stream?path=${encodeURIComponent(path)}`;
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "flex-basis:100%;width:100%;margin-top:8px;";
+    if (info.has_video) {
+      wrap.innerHTML = `<video controls preload="metadata" playsinline src="${src}" style="width:100%;max-height:320px;border-radius:8px;background:#000;"></video>`;
+    } else {
+      wrap.innerHTML = `<audio controls preload="metadata" src="${src}" style="width:100%;"></audio>`;
+    }
+    el.appendChild(wrap);
+  }
 }
 
 // ── SSE stream consumer ──────────────────────────

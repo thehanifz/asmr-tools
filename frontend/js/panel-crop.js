@@ -19,7 +19,7 @@ export function initCrop() {
     $('cropOutput').value = buildOutputPath(path, '._cropped', '.mp4');
     const info = await probeFile(path);
     if (info.error) { toast(info.error, 'error'); return; }
-    showFileInfo('cropInfo', info);
+    showFileInfo('cropInfo', info, path);
   });
 
   // ── Update summary ────────────────────────────────────────

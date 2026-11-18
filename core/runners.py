@@ -16,9 +16,13 @@ Resume contract shared by all runners:
 
 Path designs (Nov 2026):
 - Sound Layer: 60 s time windows (plus a split at the global fade start).
-  Base loop phase is exact because each window is ``atrim``-ed from a
-  ``-stream_loop`` stream (phase is automatic — verified bit-identical
-  against the same window of a full render). Placements overlapping a
+  Base loop phase is exact because each window is ``atrim``-ed from an
+  ``aloop`` loop sized by the source's probed sample count (phase is
+  automatic). ``-stream_loop`` must NOT be used for this: it eats
+  128 samples at every Vorbis loop restart, so segments came out
+  ~0.02 s short each and a 3 h render failed its final duration check
+  by 3.4 s (fixed Nov 2026; segment validation tolerance is 0.01 s so
+  pre-fix checkpoints are re-rendered on resume, not reused). Placements overlapping a
   window are trimmed AFTER their fades to the visible portion and
   delayed by (visible_start - t0). Volume factor comes from the FULL
   plan, never per-window. Segments are WAV; the final step concats them
@@ -64,6 +68,27 @@ def probe_duration(path: str) -> float | None:
             capture_output=True, text=True, timeout=60,
         )
         return float(r.stdout.strip())
+    except Exception:
+        return None
+
+
+def probe_sample_count(path: str) -> int | None:
+    """Exact sample count of the first audio stream (ffprobe duration_ts).
+
+    Needed for sample-exact looping with the ``aloop`` filter: looping an
+    OGG/Vorbis input with ``-stream_loop`` instead loses 128 samples at
+    every loop restart (decoder flush on seek-back), which made long
+    Sound Layer renders finish short (181 segments x ~0.02 s = 3.4 s on
+    a 3 h render — enough to fail the final duration check).
+    """
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0",
+             "-show_entries", "stream=duration_ts",
+             "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True, timeout=60,
+        )
+        return int(r.stdout.strip())
     except Exception:
         return None
 
@@ -195,8 +220,17 @@ def plan_sound_layer(payload: dict, workdir: str) -> dict:
     output_path = payload.get("output_path", "")
     if not output_path:
         base = os.path.splitext(plan.main_sounds[0]["path"])[0]
+        # Hasil render masuk folder media/audio — bukan folder sumber
+        # suara (bisa jadi folder library, tempatnya file elemen) —
+        # plus cap waktu supaya render berikutnya tidak menimpa.
+        from datetime import datetime
+        media_audio = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "media", "audio")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = os.path.join(
-            os.path.dirname(base), f"layer_{os.path.basename(base)}.{output_format}")
+            media_audio,
+            f"layer_{os.path.basename(base)}_{stamp}.{output_format}")
     else:
         output_path = os.path.splitext(output_path)[0] + "." + output_format
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
@@ -226,6 +260,12 @@ def plan_sound_layer(payload: dict, workdir: str) -> dict:
         "output_path": output_path,
         "volume_factor": _compute_volume_factor(plan, engine),
         "placements_count": len(plan.placements),
+        # Exact decoded sample count per main sound, for sample-exact
+        # aloop looping in the window builder (None = fall back to
+        # -stream_loop for that sound).
+        "main_sample_counts": [
+            probe_sample_count(ms["path"]) for ms in plan.main_sounds
+        ],
     }
 
 
@@ -235,8 +275,12 @@ def build_sound_layer_window_command(config, plan, t0: float, t1: float,
     """One ffmpeg command rendering window [t0, t1) of the mix.
 
     Mirrors SoundLayerEngine.build_ffmpeg_command exactly, except:
-    - main sounds are atrim-ed to the window from the -stream_loop stream
-      (loop phase is automatic and continuous with neighbouring windows);
+    - main sounds are looped sample-exactly with ``aloop`` (sized by the
+      probed sample count) and atrim-ed to the window from that loop
+      (phase is automatic and continuous with neighbouring windows).
+      ``-stream_loop`` is kept only as a fallback for sounds whose
+      sample count could not be probed — it loses 128 samples per
+      Vorbis loop restart and makes long renders finish short;
     - only placements overlapping the window are included, trimmed AFTER
       their fades to the visible portion and delayed to (visible_start - t0);
     - the global fade-out is applied only to windows reaching the fade
@@ -249,9 +293,13 @@ def build_sound_layer_window_command(config, plan, t0: float, t1: float,
     xfade = min(config.loop_xfade, target_dur * 0.4)
     fade_start = target_dur - xfade
 
+    sample_counts = getattr(config, "main_sample_counts", None) or []
     cmd = ["ffmpeg", "-y"]
-    for ms in config.main_sounds:
-        cmd.extend(["-stream_loop", "-1", "-i", ms["path"]])
+    for i, ms in enumerate(config.main_sounds):
+        if i < len(sample_counts) and sample_counts[i]:
+            cmd.extend(["-i", ms["path"]])
+        else:
+            cmd.extend(["-stream_loop", "-1", "-i", ms["path"]])
 
     overlapping = [p for p in plan.placements
                    if p.start_time < t1 and (p.start_time + p.duration) > t0]
@@ -298,8 +346,11 @@ def build_sound_layer_window_command(config, plan, t0: float, t1: float,
     for i, ms in enumerate(config.main_sounds):
         label = f"main{i}"
         vol = ms.get("volume", 100) / 100.0
-        chain = (f"[{i}:a]atrim=start={t0:.6f}:end={t1:.6f},"
-                 f"asetpts=PTS-STARTPTS")
+        chain = f"[{i}:a]"
+        if i < len(sample_counts) and sample_counts[i]:
+            chain += f"aloop=loop=-1:size={sample_counts[i]},"
+        chain += (f"atrim=start={t0:.6f}:end={t1:.6f},"
+                  f"asetpts=PTS-STARTPTS")
         if xfade > 0 and t1 > fade_start:
             chain += (f",afade=t=out:st={max(fade_start - t0, 0.0):.6f}:"
                       f"d={xfade:.6f}")
@@ -339,6 +390,7 @@ async def run_sound_layer(ctx: JobContext, record: dict) -> str:
         main_sounds=plan.main_sounds,
         target_duration=info["target_duration"],
         loop_xfade=info["loop_xfade"],
+        main_sample_counts=info.get("main_sample_counts") or [],
     )
     output_path = info["output_path"]
     output_format = info["output_format"]
@@ -354,7 +406,11 @@ async def run_sound_layer(ctx: JobContext, record: dict) -> str:
         t0, t1 = float(t0), float(t1)
         seg_path = os.path.join(ctx.workdir, f"seg_{i:03d}.wav")
         label = f"Segmen {i + 1}/{total} ({t0:.0f}–{t1:.0f} dtk)"
-        if i in done and validate_media(seg_path, t1 - t0, tol=1.0):
+        # Tight tolerance on purpose: segments are sample-exact since
+        # the aloop fix, and a loose one would happily reuse pre-fix
+        # segments that are each ~0.02 s short (which adds up past the
+        # final check on long renders).
+        if i in done and validate_media(seg_path, t1 - t0, tol=0.01):
             ctx.log(f"⏭ {label} sudah ada, dilewati.")
             ctx.emit({"type": "step_done", "step": i + 1, "total": total,
                       "label": label, "elapsed": "0s",
@@ -372,7 +428,7 @@ async def run_sound_layer(ctx: JobContext, record: dict) -> str:
             progress_start=p_start, progress_end=p_end)
         if rc != 0:
             raise JobError(f"ffmpeg gagal pada {label} (kode {rc})")
-        if not validate_media(seg_path, t1 - t0, tol=1.0):
+        if not validate_media(seg_path, t1 - t0, tol=0.01):
             raise JobError(f"{label} tidak valid (durasi tidak cocok)")
         ctx.mark_segment_done(i)
         ctx.emit({"type": "step_done", "step": i + 1, "total": total,

@@ -396,7 +396,7 @@
         <div class="field-group">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <label class="field-label" style="margin-bottom:0;">Main Sounds <span class="field-hint">(Base Layer, maks 3)</span></label>
-            <button class="btn btn-ghost btn-add" id="soundLayerAddMainBtn" style="font-size:12px;padding:2px 8px;">⬆ Upload</button>
+            <button class="btn btn-ghost btn-add" id="soundLayerAddMainBtn" style="font-size:12px;padding:2px 8px;">＋ Dari Server</button>
           </div>
           <div id="soundLayerMainList" style="display:flex;flex-direction:column;gap:12px;"></div>
         </div>
@@ -434,7 +434,7 @@
         <div class="field-group">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <label class="field-label" style="margin-bottom:0;">Optional Sounds <span class="field-hint">— tiap sound punya setting sendiri</span></label>
-            <button class="btn btn-ghost btn-add" id="optAddSoundBtn" style="font-size:12px;padding:2px 8px;">⬆ Upload Sound</button>
+            <button class="btn btn-ghost btn-add" id="optAddSoundBtn" style="font-size:12px;padding:2px 8px;">＋ Dari Server</button>
           </div>
           <div id="optSoundList" style="display:flex;flex-direction:column;gap:8px;"></div>
           <p class="field-hint" style="margin-top:8px;">Estimasi (~Nx) dihitung otomatis dari frekuensi, ukuran clip, dan window.</p>
@@ -453,6 +453,11 @@
               <option value="300">5m</option>
             </select>
           </div>
+          <div style="display:flex;gap:6px;align-items:stretch;margin-top:8px;">
+            <button class="btn btn-secondary" id="slRealtimePlayBtn" style="flex:1;margin-top:0;padding:11px 4px;font-size:14px;">▶ Preview Realtime</button>
+            <button class="btn btn-ghost" id="slRealtimeStopBtn" style="margin-top:0;padding:11px 10px;font-size:14px;" disabled>⏹ Stop</button>
+          </div>
+          <p class="field-hint" id="slRealtimeStatus" style="margin-top:6px;">Preview realtime: semua main sound + backsound diputar barengan langsung dari browser (streaming, tanpa render). Geser slider volume tiap track — perubahannya langsung terdengar. Optional sound diputar loop untuk cek blend; di render asli ia muncul berkala. Kalau tambah/hapus track, Stop lalu Putar lagi.</p>
           <button class="btn btn-primary btn-full" id="soundLayerRenderBtn">▶ Render Full Output</button>
         </div>
 
@@ -489,6 +494,13 @@
         <div class="field-group"><label class="field-label">Sumber Audio</label><div style="display:flex;gap:16px;margin-bottom:8px;"><label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceManual" value="manual" checked><span class="checkmark" style="border-radius:50%"></span> Manual Layers</label><label class="checkbox-label"><input type="radio" name="mergeAudioSource" id="mergeAudioSourceLayer" value="layer"><span class="checkmark" style="border-radius:50%"></span> Sound Layer Output</label></div></div>
         <div class="field-group"><label class="field-label">Audio Layers <span class="hint">(max 4)</span></label><div id="audioLayers"></div><button class="btn btn-ghost btn-add" id="addAudioLayer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Tambah Audio</button></div>
         <div class="field-group"><label class="field-label">Output</label><input type="text" id="mergeOutput" class="file-input" placeholder="Otomatis dari workspace..." readonly></div>
+        <div class="field-group"><label class="checkbox-label"><input type="checkbox" id="finEnable"><span class="checkmark"></span> Finishing: intro card + fade + thumbnail <span class="hint">(standar channel — jalan otomatis setelah merge)</span></label>
+          <div id="finFields" style="display:none;margin-top:8px;">
+            <div class="field-group"><label class="field-label">Judul Adegan <span class="hint">(baris 1 intro card, mis. Forest Waterfall at Dusk)</span></label><input type="text" id="finSceneTitle" class="file-input" placeholder="Kosongkan = tebak dari nama file video"></div>
+            <div class="field-group"><label class="field-label">Elemen Suara <span class="hint">(baris 3 intro card)</span></label><input type="text" id="finSoundLine" class="file-input" placeholder="Kosongkan = otomatis dari job Sound Layer"></div>
+            <div class="field-group"><label class="field-label">Judul Thumbnail <span class="hint">(teks besar di thumbnail)</span></label><input type="text" id="finThumbTitle" class="file-input" placeholder="Kosongkan = 2 kata pertama judul adegan"></div>
+          </div>
+        </div>
         <button class="btn btn-primary btn-full" id="mergeProcess">▶ Merge</button>
         <div class="progress-wrap" id="mergeProgressWrap"><div class="progress-bar"><div class="progress-fill" id="mergeProgressFill"></div></div><div class="progress-label" id="mergeProgressLabel"></div></div>
         <div class="log-box" id="mergeLog"></div>
@@ -499,6 +511,14 @@
           <div style="display:flex;gap:8px;align-items:center;">
             <a id="mergeDownload" class="btn btn-primary" href="#" download style="text-decoration:none;">⬇ Unduh Hasil</a>
             <span id="mergeResultName" style="font-size:12px;color:var(--text-muted,#8a90a0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          </div>
+          <div id="finResult" style="display:none;margin-top:12px;">
+            <label class="field-label">Thumbnail Hasil Finishing</label>
+            <img id="finThumbPreview" alt="Thumbnail" style="width:100%;border-radius:10px;display:block;">
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+              <a id="finThumbDownload" class="btn btn-secondary" href="#" download style="text-decoration:none;">⬇ Unduh Thumbnail</a>
+              <span id="finThumbName" style="font-size:12px;color:var(--text-muted,#8a90a0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            </div>
           </div>
         </div>
       </div>
