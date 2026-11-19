@@ -137,9 +137,15 @@ def list_job_records() -> list:
             continue
         try:
             with open(os.path.join(JOBS_DIR, name), encoding="utf-8") as f:
-                records.append(json.load(f))
+                data = json.load(f)
         except (json.JSONDecodeError, OSError):
             continue
+        # Folder ini juga menyimpan manifes upload YouTube (title/video_id/
+        # publish_at) — bukan record job. Lewati agar daftar job tidak
+        # crash hanya karena file non-job ikut terbaca.
+        if not isinstance(data, dict) or "id" not in data or "type" not in data:
+            continue
+        records.append(data)
     records.sort(key=lambda r: r.get("created_at", ""), reverse=True)
     return records
 
